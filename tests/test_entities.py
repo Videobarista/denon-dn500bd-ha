@@ -136,10 +136,10 @@ async def test_select_and_switch(
     select_id = entity_id(hass, entry, "select", "dvvr")
     assert hass.states.get(select_id).state == "1080p"
     await hass.services.async_call(
-        "select", "select_option", {"entity_id": select_id, "option": "720p"}, blocking=True
+        "select", "select_option", {"entity_id": select_id, "option": "1080i"}, blocking=True
     )
-    assert "DVVR4" in player.received
-    await wait_for(lambda: hass.states.get(select_id).state == "720p")
+    assert "DVVR5" in player.received
+    await wait_for(lambda: hass.states.get(select_id).state == "1080i")
 
     switch_id = entity_id(hass, entry, "switch", "pcap")
     assert hass.states.get(switch_id).state == "on"
@@ -153,7 +153,7 @@ async def test_unknown_setting_value(
 ) -> None:
     """A value outside the documented list shows as unknown, not as an error."""
     player.values["DVVR"] = "7"
-    player.push("DVVR7")
+    player.push("DVVR9")
     select_id = entity_id(hass, entry, "select", "dvvr")
     await wait_for(lambda: hass.states.get(select_id).state == "unknown")
 
@@ -163,3 +163,41 @@ async def test_button(hass: HomeAssistant, entry: MockConfigEntry, player: FakeP
     button_id = entity_id(hass, entry, "button", "menu_home")
     await hass.services.async_call("button", "press", {"entity_id": button_id}, blocking=True)
     assert "PCHM" in player.received
+
+
+async def test_resolution_documented_set_codes(
+    hass: HomeAssistant, entry: MockConfigEntry, player: FakePlayer
+) -> None:
+    """Player reports one higher than it is set with: documented codes are kept."""
+    player.readback_shift["DVVR"] = 1
+    select_id = entity_id(hass, entry, "select", "dvvr")
+    assert hass.states.get(select_id).state == "1080p"  # reported 7
+    await hass.services.async_call(
+        "select", "select_option", {"entity_id": select_id, "option": "720p"}, blocking=True
+    )
+    await wait_for(lambda: hass.states.get(select_id).state == "720p")
+    assert "DVVR4" in player.received
+    assert "DVVR5" not in player.received
+    await hass.services.async_call(
+        "select", "select_option", {"entity_id": select_id, "option": "1080p"}, blocking=True
+    )
+    await wait_for(lambda: hass.states.get(select_id).state == "1080p")
+    assert "DVVR6" in player.received
+
+
+async def test_resolution_shifted_set_codes(
+    hass: HomeAssistant, entry: MockConfigEntry, player: FakePlayer
+) -> None:
+    """Player uses one table for set and report: the first change is corrected."""
+    select_id = entity_id(hass, entry, "select", "dvvr")
+    await hass.services.async_call(
+        "select", "select_option", {"entity_id": select_id, "option": "720p"}, blocking=True
+    )
+    await wait_for(lambda: hass.states.get(select_id).state == "720p")
+    assert player.received.index("DVVR4") < player.received.index("DVVR5")
+    await hass.services.async_call(
+        "select", "select_option", {"entity_id": select_id, "option": "1080p"}, blocking=True
+    )
+    await wait_for(lambda: hass.states.get(select_id).state == "1080p")
+    assert "DVVR7" in player.received
+    assert "DVVR6" not in player.received

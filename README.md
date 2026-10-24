@@ -150,7 +150,7 @@ Other questions:
 | No title for Blu-ray or DVD | Discs do not report a title; only CD text and file tags (USB/SD) do. |
 | Position and length look odd | They are those of the current title, as reported by the player: in a disc menu or between titles they start again. |
 | A setting entity is missing | It is disabled by default (enable it), or your player did not report it during the probe: use **Detect supported features again** with the player switched on. |
-| A select shows `unknown` | The player reports a value that is not in the documented list (for example video resolution `7`). |
+| A select shows `unknown` | The player reports a value that is not in the documented list. |
 
 Debug logging:
 
@@ -179,6 +179,10 @@ differs from the RS-232 description:
 - Several settings that the guide lists as write-only can also be read back
   (mute, output level, picture, audio and video settings); those are what the
   capability probe looks for.
+- The video resolution is reported one higher than the documented set codes
+  (1080p is reported as `7`). The integration maps the reported values and,
+  on the first change, checks whether the set codes are shifted as well and
+  corrects itself if needed.
 - Fast forward / rewind are not offered: the guide lists conflicting codes.
 
 ## Quality scale

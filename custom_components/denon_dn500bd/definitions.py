@@ -166,13 +166,18 @@ class NumberSetting:
 
 @dataclass(frozen=True)
 class SelectSetting:
-    """A choice the player can report and set (option -> code suffix)."""
+    """A choice the player can report and set (option -> code suffix).
+
+    ``readback`` maps reported values to options when the player reports
+    other codes than the ones it is set with (see the video resolution).
+    """
 
     code: str
     key: str
     options: dict[str, str] = field(default_factory=dict)
     enabled_default: bool = True
     icon: str | None = None
+    readback: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -219,6 +224,17 @@ SELECTS: tuple[SelectSetting, ...] = (
             "1080p": "6",
         },
         icon="mdi:monitor-screenshot",
+        # Measured: the player reports 7 while set to 1080p, so the reported
+        # values run one higher than the documented set codes 1-6. Whether the
+        # set codes are shifted too is checked on the first change (select.py).
+        readback={
+            "2": "auto",
+            "3": "480i_576i",
+            "4": "480p_576p",
+            "5": "720p",
+            "6": "1080i",
+            "7": "1080p",
+        },
     ),
     SelectSetting(
         "DVAr",

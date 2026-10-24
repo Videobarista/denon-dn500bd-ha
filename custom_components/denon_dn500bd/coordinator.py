@@ -545,16 +545,21 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
         self._schedule_poll(const.REFRESH_DELAY_COMMAND)
         return True
 
-    async def async_set_setting(self, code: str, suffix: str) -> None:
-        """Change a setting and read it back (the reply is the truth)."""
+    async def async_set_setting(self, code: str, suffix: str) -> bool:
+        """Change a setting and read it back (the reply is the truth).
+
+        Returns True when the player acknowledged the change and answered the
+        read-back.
+        """
         if not await self.async_send_command(code + suffix):
-            return
+            return False
         try:
             await self._query("?" + code)
         except DenonConnectionError as err:
             await self._connection_failed(err)
-            return
+            return False
         self.async_set_updated_data(self.data)
+        return True
 
     @property
     def power_on_entity(self) -> str | None:

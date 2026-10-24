@@ -35,7 +35,7 @@ DEFAULT_VALUES: dict[str, str] = {
     "DVPACT": "000",
     "DVPAHU": "00",
     "DVPASR": "00",
-    "DVVR": "6",
+    "DVVR": "7",
     "DVAr": "9A",
     "DVFM": "MS",
     "DVCS": "Y2",
@@ -109,6 +109,8 @@ class FakePlayer:
         self.received: list[str] = []
         self.respond = True
         self.nack: set[str] = set()
+        # Codes whose reported value runs this much higher than the set code.
+        self.readback_shift: dict[str, int] = {}
         self.port = 0
         self._server: asyncio.Server | None = None
         self._writers: list[asyncio.StreamWriter] = []
@@ -199,7 +201,10 @@ class FakePlayer:
         elif command in ("2332", "2333", "PW00", "PW01") or command.startswith(("PC", "DV", "23")):
             for code in _SETTING_CODES:
                 if command.startswith(code) and len(command) > len(code):
-                    self.values[code] = command[len(code) :]
+                    value = command[len(code) :]
+                    if code in self.readback_shift and value.isdigit():
+                        value = str(int(value) + self.readback_shift[code])
+                    self.values[code] = value
                     break
         elif command.startswith("mt"):
             self.values["mt"] = command[2:]
