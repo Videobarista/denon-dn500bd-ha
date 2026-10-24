@@ -319,6 +319,7 @@ class DenonClient:
                 await asyncio.sleep(wait)
             future: asyncio.Future[Reply] = asyncio.get_running_loop().create_future()
             self._pending = future
+            self._last_send = time.monotonic()
             try:
                 writer.write(b"@0" + command.encode("latin-1") + b"\r")
                 await writer.drain()
@@ -331,7 +332,6 @@ class DenonClient:
                 raise DenonConnectionError(const.REASON_LOST, str(err)) from err
             finally:
                 self._pending = None
-                self._last_send = time.monotonic()
 
     async def _drop(self, reason: str) -> None:
         """Close after a failure and report it."""

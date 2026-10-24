@@ -195,9 +195,10 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
         self.data = DenonData()
         self._wake = asyncio.Event()
         self._connect_lock = asyncio.Lock()
-        self._refresh_handle: asyncio.TimerHandle | None = None
+        self._poll_handle: asyncio.TimerHandle | None = None
         self._quick_check = False
         self._details_due = True
+        self._full_due = True
         self._last_full = 0.0
         self._unexpected_logged = False
         self._was_online = False
@@ -215,8 +216,9 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
     async def async_start(self) -> None:
         """Try to reach the player once, then keep the connection in the background."""
         try:
+            # Keep setup short: status and media now, settings right after.
             async with asyncio.timeout(const.FIRST_ATTEMPT_TIMEOUT):
-                await self._try_connect(full=True)
+                await self._try_connect(full=False)
         except TimeoutError:
             await self.client.close()
             self._set_offline(const.REASON_NO_RESPONSE)
@@ -227,9 +229,9 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
     async def async_shutdown(self) -> None:
         """Stop the connection loop and close the connection on unload."""
         self._stopping = True
-        if self._refresh_handle is not None:
-            self._refresh_handle.cancel()
-            self._refresh_handle = None
+        if self._poll_handle is not None:
+            self._poll_handle.cancel()
+            self._poll_handle = None
         task, self._task = self._task, None
         if task is not None and not task.done():
             task.cancel()
@@ -243,10 +245,14 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
         while True:
             try:
                 if self.client.connected and self.data.online:
-                    await self._wait(self.poll_interval)
+                    if not self._full_due:
+                        await self._wait(self.poll_interval)
                     if not self.client.connected:
                         continue
-                    full = time.monotonic() - self._last_full >= const.FULL_REFRESH_INTERVAL
+                    full = (
+                        self._full_due
+                        or time.monotonic() - self._last_full >= const.FULL_REFRESH_INTERVAL
+                    )
                     await self._poll(full=full)
                     continue
                 if self._quick_check:
@@ -265,9 +271,18 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
                 if not self._unexpected_logged:
                     self._unexpected_logged = True
                     _LOGGER.exception("Unexpected error talking to %s", self.client.host)
-                await self.client.close()
-                self._set_offline(const.REASON_NETWORK)
+                await self._recover()
                 await asyncio.sleep(const.RETRY_FIRST)
+
+    async def _recover(self) -> None:
+        """After an unexpected error: close and show offline, without killing the loop."""
+        try:
+            await self.client.close()
+            self._set_offline(const.REASON_NETWORK)
+        except Exception:  # noqa: BLE001 - the loop must keep running
+            _LOGGER.debug(
+                "Error while recovering connection to %s", self.client.host, exc_info=True
+            )
 
     async def _connection_failed(self, err: DenonConnectionError) -> None:
         """A request failed: a dropped connection gets one quick check first."""
@@ -344,6 +359,7 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
             for code in sorted(self.capabilities or ()):
                 await self._query("?" + code)
             self._last_full = time.monotonic()
+            self._full_due = False
         self._mark_seen()
         self.async_set_updated_data(self.data)
 
@@ -455,7 +471,7 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
                     details = True
         if details:
             self._details_due = True
-            self._schedule_refresh(const.REFRESH_DELAY_PUSH)
+            self._schedule_poll(const.REFRESH_DELAY_PUSH)
         if changed and self.data.online:
             self.async_set_updated_data(self.data)
 
@@ -467,16 +483,16 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
         self._wake.set()
 
     @callback
-    def _schedule_refresh(self, delay: float) -> None:
+    def _schedule_poll(self, delay: float) -> None:
         if self._stopping:
             return
-        if self._refresh_handle is not None:
-            self._refresh_handle.cancel()
-        self._refresh_handle = self.hass.loop.call_later(delay, self._fire_refresh)
+        if self._poll_handle is not None:
+            self._poll_handle.cancel()
+        self._poll_handle = self.hass.loop.call_later(delay, self._fire_poll)
 
     @callback
-    def _fire_refresh(self) -> None:
-        self._refresh_handle = None
+    def _fire_poll(self) -> None:
+        self._poll_handle = None
         self._wake.set()
 
     # --- commands -----------------------------------------------------------
@@ -496,7 +512,7 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
             _LOGGER.debug("Player %s refused %s (nack)", self.client.host, command)
             return False
         self._details_due = True
-        self._schedule_refresh(const.REFRESH_DELAY_COMMAND)
+        self._schedule_poll(const.REFRESH_DELAY_COMMAND)
         return True
 
     async def async_set_setting(self, code: str, suffix: str) -> None:

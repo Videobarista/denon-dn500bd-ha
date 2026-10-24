@@ -19,6 +19,9 @@ async def entry(hass: HomeAssistant, player: FakePlayer) -> AsyncGenerator[MockC
     """The integration set up against the fake player."""
     config_entry = make_entry(player.port)
     await setup_entry(hass, config_entry)
+    # Settings are read right after setup; wait until the last one (mute) is in.
+    player_id = entity_id(hass, config_entry, "media_player", "media_player")
+    await wait_for(lambda: hass.states.get(player_id).attributes.get("is_volume_muted") is not None)
     yield config_entry
     await unload_entry(hass, config_entry)
 

@@ -8,10 +8,12 @@ import logging
 import pytest
 
 from custom_components.denon_dn500bd.const import CONF_CAPABILITIES
+from custom_components.denon_dn500bd.coordinator import DenonCoordinator
 from custom_components.denon_dn500bd.diagnostics import async_get_config_entry_diagnostics
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import STATE_OFF, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .common import entity_id, make_entry, setup_entry, unload_entry
 from .fake_player import FakePlayer, free_port, wait_for
@@ -171,3 +173,15 @@ async def test_diagnostics_redact_address(hass: HomeAssistant, player: FakePlaye
         assert "127.0.0.1" not in str(result)
     finally:
         await unload_entry(hass, entry)
+
+
+def test_no_accidental_coordinator_overrides() -> None:
+    """Helpers must not shadow DataUpdateCoordinator internals (v1.0.0 bug)."""
+    allowed = {"__init__", "async_shutdown"}
+    base = set(dir(DataUpdateCoordinator))
+    overridden = {
+        name
+        for name in vars(DenonCoordinator)
+        if name in base and name not in allowed and not name.startswith("__")
+    }
+    assert not overridden

@@ -35,7 +35,7 @@ RETRY_FACTOR: Final = 1.5
 FIRST_ATTEMPT_TIMEOUT: Final = 12.0
 
 # The protocol asks for >= 30 ms between commands on the LAN port.
-COMMAND_GAP: Final = 0.05
+COMMAND_GAP: Final = 0.04
 # A burst of bytes from the player is complete after this much silence.
 BURST_IDLE: Final = 0.03
 # A refresh requested by a push notification or a command is delayed a bit.
