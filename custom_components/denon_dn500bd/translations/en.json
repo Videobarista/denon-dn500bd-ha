@@ -1,0 +1,399 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Denon DN-500BD MKII",
+        "description": "Enter the address of the player. Control runs over TCP port 9030. The player accepts only one controller at a time, so close other control software first.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "add_offline": "Add even if the player is switched off now"
+        },
+        "data_description": {
+          "host": "IP address or hostname of the player (Setup > Network > Information on the player).",
+          "port": "Leave at 9030 unless you route the connection through something else.",
+          "add_offline": "The supported features are detected the first time the player answers."
+        }
+      },
+      "reconfigure": {
+        "title": "Change address",
+        "description": "Enter the new address of the player.",
+        "data": {
+          "host": "Host",
+          "port": "Port"
+        },
+        "data_description": {
+          "host": "IP address or hostname of the player (Setup > Network > Information on the player).",
+          "port": "Leave at 9030 unless you route the connection through something else."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot reach the player. Check the address, that the player is switched on, and that no other controller is connected to port 9030."
+    },
+    "abort": {
+      "already_configured": "This player is already configured.",
+      "reconfigure_successful": "The address was updated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "poll_interval": "Status poll interval",
+          "reprobe": "Detect supported features again"
+        },
+        "data_description": {
+          "poll_interval": "Seconds between light status polls. The player also pushes changes itself, so a short interval is not needed.",
+          "reprobe": "Use after a firmware update. The entities are rebuilt the next time the player answers."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "connection": {
+        "name": "Connection",
+        "state": {
+          "online": "Online",
+          "offline": "Offline"
+        },
+        "state_attributes": {
+          "reason": {
+            "name": "Reason",
+            "state": {
+              "starting": "Starting",
+              "connection_refused": "Connection refused (standby, or another controller is connected)",
+              "connect_timeout": "No answer (switched off or wrong address)",
+              "host_unreachable": "Network unreachable",
+              "no_response": "Player does not respond (standby, or its network is stuck)",
+              "connection_lost": "Connection lost",
+              "network_error": "Network error"
+            }
+          }
+        }
+      },
+      "last_seen": {
+        "name": "Last seen"
+      },
+      "disc_status": {
+        "name": "Disc status",
+        "state": {
+          "no_disc": "No disc",
+          "disc_in": "Disc loaded",
+          "unformatted": "Unformatted disc",
+          "tray_open": "Tray open",
+          "tray_closed": "Tray closed",
+          "tray_error": "Tray error",
+          "loading": "Loading"
+        }
+      },
+      "disc_type": {
+        "name": "Disc type",
+        "state": {
+          "dvd_video": "DVD-Video",
+          "dvd_audio": "DVD-Audio",
+          "cd_audio": "Audio CD",
+          "cd_rom": "CD-ROM",
+          "sacd": "SACD",
+          "dvd_vr": "DVD-VR",
+          "bd_video": "Blu-ray (BDMV)",
+          "bdav": "Blu-ray (BDAV)",
+          "avchd": "AVCHD",
+          "dlna": "DLNA",
+          "external_memory": "USB / SD"
+        }
+      },
+      "playback_status": {
+        "name": "Playback status",
+        "state": {
+          "idle": "Idle",
+          "playing": "Playing",
+          "paused": "Paused",
+          "slow_forward": "Slow forward",
+          "slow_reverse": "Slow reverse",
+          "fast_forward": "Fast forward",
+          "fast_reverse": "Fast reverse",
+          "step": "Frame step",
+          "menu": "Menu",
+          "setup": "Setup menu",
+          "track_menu": "Disc menu",
+          "home": "Home menu"
+        }
+      },
+      "playback_chapter": {
+        "name": "Playback chapter"
+      },
+      "playback_chapter_count": {
+        "name": "Playback chapter count"
+      },
+      "playback_title": {
+        "name": "Playback title number"
+      },
+      "playback_title_count": {
+        "name": "Playback title count"
+      },
+      "playback_elapsed": {
+        "name": "Playback elapsed"
+      },
+      "playback_remaining": {
+        "name": "Playback remaining"
+      },
+      "audio_format": {
+        "name": "Audio format"
+      },
+      "audio_channels": {
+        "name": "Audio channels"
+      },
+      "audio_sample_rate": {
+        "name": "Audio sample rate"
+      },
+      "audio_language": {
+        "name": "Audio language"
+      },
+      "audio_language_secondary": {
+        "name": "Audio language (secondary)"
+      },
+      "subtitle_language": {
+        "name": "Subtitle language"
+      }
+    },
+    "number": {
+      "audio_output_level": {
+        "name": "Audio output level"
+      },
+      "audio_maximum_volume": {
+        "name": "Audio maximum volume"
+      },
+      "video_brightness": {
+        "name": "Video brightness"
+      },
+      "video_contrast": {
+        "name": "Video contrast"
+      },
+      "video_hue": {
+        "name": "Video hue"
+      },
+      "video_saturation": {
+        "name": "Video saturation"
+      }
+    },
+    "select": {
+      "video_resolution": {
+        "name": "Video resolution",
+        "state": {
+          "auto": "Auto",
+          "480i_576i": "480i/576i",
+          "480p_576p": "480p/576p",
+          "720p": "720p",
+          "1080i": "1080i",
+          "1080p": "1080p"
+        }
+      },
+      "video_aspect_ratio": {
+        "name": "Video aspect ratio",
+        "state": {
+          "wide_16_9": "16:9 Wide",
+          "wide_auto_16_9": "16:9 Wide/Auto",
+          "pan_scan_4_3": "4:3 Pan & Scan",
+          "letterbox_4_3": "4:3 Letterbox"
+        }
+      },
+      "video_tv_system": {
+        "name": "Video TV system",
+        "state": {
+          "ntsc": "NTSC",
+          "pal": "PAL",
+          "multi": "Multi-system"
+        }
+      },
+      "video_color_space": {
+        "name": "Video HDMI color space",
+        "state": {
+          "rgb_video": "RGB video level",
+          "rgb_pc": "RGB PC level",
+          "ycbcr_444": "YCbCr 4:4:4",
+          "ycbcr_422": "YCbCr 4:2:2"
+        }
+      },
+      "video_deep_color": {
+        "name": "Video HDMI deep color",
+        "state": {
+          "bit_48": "48 bit",
+          "bit_36": "36 bit",
+          "bit_30": "30 bit",
+          "off": "Off (24 bit)"
+        }
+      },
+      "audio_hdmi_format": {
+        "name": "Audio HDMI format",
+        "state": {
+          "stereo": "Stereo",
+          "lpcm": "LPCM",
+          "bitstream": "Bitstream"
+        }
+      },
+      "audio_coaxial_output": {
+        "name": "Audio coaxial output",
+        "state": {
+          "lpcm_48k": "48k LPCM",
+          "lpcm_96k": "96k LPCM",
+          "lpcm_192k": "192k LPCM",
+          "bitstream": "Bitstream"
+        }
+      },
+      "audio_dynamic_range": {
+        "name": "Audio dynamic range control",
+        "state": {
+          "auto": "Auto",
+          "on": "On",
+          "off": "Off"
+        }
+      },
+      "audio_speaker_configuration": {
+        "name": "Audio speaker configuration",
+        "state": {
+          "lt_rt": "Lt/Rt",
+          "stereo": "Stereo",
+          "ch_2_1": "2.1",
+          "ch_3_1": "3.1",
+          "ch_5_1": "5.1",
+          "ch_7_1": "7.1"
+        }
+      },
+      "system_time_display": {
+        "name": "System time display",
+        "state": {
+          "track_elapsed": "Chapter elapsed",
+          "track_remaining": "Chapter remaining",
+          "total_elapsed": "Total elapsed",
+          "total_remaining": "Total remaining"
+        }
+      },
+      "system_remote_code": {
+        "name": "System remote control code",
+        "state": {
+          "code_1": "Code 1",
+          "code_2": "Code 2",
+          "code_3": "Code 3"
+        }
+      }
+    },
+    "switch": {
+      "system_auto_play": {
+        "name": "System auto play"
+      },
+      "system_auto_resume": {
+        "name": "System auto resume"
+      },
+      "system_on_screen_display": {
+        "name": "System on-screen display"
+      },
+      "system_ir_remote_sensor": {
+        "name": "System IR remote sensor"
+      },
+      "system_hdmi_cec": {
+        "name": "System HDMI CEC"
+      },
+      "system_program_mode": {
+        "name": "System program mode"
+      },
+      "video_1080p24_conversion": {
+        "name": "Video 1080p24 conversion"
+      },
+      "video_3d_output": {
+        "name": "Video 3D output"
+      },
+      "video_pip_mark": {
+        "name": "Video PIP mark"
+      },
+      "audio_secondary_audio_mark": {
+        "name": "Audio secondary audio mark"
+      }
+    },
+    "button": {
+      "disc_eject": {
+        "name": "Disc eject"
+      },
+      "disc_close_tray": {
+        "name": "Disc close tray"
+      },
+      "menu_home": {
+        "name": "Menu home"
+      },
+      "menu_top": {
+        "name": "Menu disc top menu"
+      },
+      "menu_popup": {
+        "name": "Menu pop-up"
+      },
+      "menu_option": {
+        "name": "Menu options"
+      },
+      "menu_setup": {
+        "name": "Menu setup"
+      },
+      "menu_return": {
+        "name": "Menu return"
+      },
+      "navigation_up": {
+        "name": "Navigation up"
+      },
+      "navigation_down": {
+        "name": "Navigation down"
+      },
+      "navigation_left": {
+        "name": "Navigation left"
+      },
+      "navigation_right": {
+        "name": "Navigation right"
+      },
+      "navigation_enter": {
+        "name": "Navigation enter"
+      },
+      "playback_audio_primary": {
+        "name": "Playback audio track"
+      },
+      "playback_audio_secondary": {
+        "name": "Playback secondary audio"
+      },
+      "playback_subtitle": {
+        "name": "Playback subtitle"
+      },
+      "playback_angle": {
+        "name": "Playback angle"
+      },
+      "playback_next_title": {
+        "name": "Playback next title"
+      },
+      "playback_previous_title": {
+        "name": "Playback previous title"
+      },
+      "playback_pip_mode": {
+        "name": "Playback PIP mode"
+      },
+      "playback_display_info": {
+        "name": "Playback display info"
+      },
+      "color_red": {
+        "name": "Color red"
+      },
+      "color_green": {
+        "name": "Color green"
+      },
+      "color_blue": {
+        "name": "Color blue"
+      },
+      "color_yellow": {
+        "name": "Color yellow"
+      },
+      "system_panel_lock": {
+        "name": "System lock front panel"
+      },
+      "system_panel_unlock": {
+        "name": "System unlock front panel"
+      }
+    }
+  }
+}

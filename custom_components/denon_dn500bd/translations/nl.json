@@ -1,0 +1,399 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Denon DN-500BD MKII",
+        "description": "Vul het adres van de speler in. De besturing loopt via TCP-poort 9030. De speler accepteert maar één controller tegelijk, sluit dus eerst andere besturingssoftware af.",
+        "data": {
+          "host": "Host",
+          "port": "Poort",
+          "add_offline": "Toevoegen, ook als de speler nu uit staat"
+        },
+        "data_description": {
+          "host": "IP-adres of hostnaam van de speler (Setup > Network > Information op de speler).",
+          "port": "Laat op 9030 staan, tenzij de verbinding via iets anders loopt.",
+          "add_offline": "De ondersteunde functies worden herkend zodra de speler voor het eerst antwoordt."
+        }
+      },
+      "reconfigure": {
+        "title": "Adres wijzigen",
+        "description": "Vul het nieuwe adres van de speler in.",
+        "data": {
+          "host": "Host",
+          "port": "Poort"
+        },
+        "data_description": {
+          "host": "IP-adres of hostnaam van de speler (Setup > Network > Information op de speler).",
+          "port": "Laat op 9030 staan, tenzij de verbinding via iets anders loopt."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "De speler is niet bereikbaar. Controleer het adres, of de speler aan staat en of er geen andere controller met poort 9030 verbonden is."
+    },
+    "abort": {
+      "already_configured": "Deze speler is al ingesteld.",
+      "reconfigure_successful": "Het adres is bijgewerkt."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opties",
+        "data": {
+          "poll_interval": "Interval statuscontrole",
+          "reprobe": "Ondersteunde functies opnieuw herkennen"
+        },
+        "data_description": {
+          "poll_interval": "Seconden tussen lichte statuscontroles. De speler meldt wijzigingen ook zelf, een kort interval is dus niet nodig.",
+          "reprobe": "Gebruik dit na een firmware-update. De entiteiten worden opnieuw opgebouwd zodra de speler antwoordt."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "connection": {
+        "name": "Verbinding",
+        "state": {
+          "online": "Online",
+          "offline": "Offline"
+        },
+        "state_attributes": {
+          "reason": {
+            "name": "Reden",
+            "state": {
+              "starting": "Opstarten",
+              "connection_refused": "Verbinding geweigerd (standby, of een andere controller is verbonden)",
+              "connect_timeout": "Geen antwoord (uit of verkeerd adres)",
+              "host_unreachable": "Netwerk onbereikbaar",
+              "no_response": "Speler reageert niet (standby, of netwerk vastgelopen)",
+              "connection_lost": "Verbinding verbroken",
+              "network_error": "Netwerkfout"
+            }
+          }
+        }
+      },
+      "last_seen": {
+        "name": "Laatst gezien"
+      },
+      "disc_status": {
+        "name": "Disc status",
+        "state": {
+          "no_disc": "Geen disc",
+          "disc_in": "Disc geladen",
+          "unformatted": "Ongeformatteerde disc",
+          "tray_open": "Lade open",
+          "tray_closed": "Lade dicht",
+          "tray_error": "Ladefout",
+          "loading": "Laden"
+        }
+      },
+      "disc_type": {
+        "name": "Disc type",
+        "state": {
+          "dvd_video": "DVD-Video",
+          "dvd_audio": "DVD-Audio",
+          "cd_audio": "Audio-cd",
+          "cd_rom": "CD-ROM",
+          "sacd": "SACD",
+          "dvd_vr": "DVD-VR",
+          "bd_video": "Blu-ray (BDMV)",
+          "bdav": "Blu-ray (BDAV)",
+          "avchd": "AVCHD",
+          "dlna": "DLNA",
+          "external_memory": "USB / SD"
+        }
+      },
+      "playback_status": {
+        "name": "Afspelen status",
+        "state": {
+          "idle": "Inactief",
+          "playing": "Speelt",
+          "paused": "Gepauzeerd",
+          "slow_forward": "Vertraagd vooruit",
+          "slow_reverse": "Vertraagd achteruit",
+          "fast_forward": "Snel vooruit",
+          "fast_reverse": "Snel achteruit",
+          "step": "Beeld voor beeld",
+          "menu": "Menu",
+          "setup": "Instellingenmenu",
+          "track_menu": "Discmenu",
+          "home": "Startmenu"
+        }
+      },
+      "playback_chapter": {
+        "name": "Afspelen hoofdstuk"
+      },
+      "playback_chapter_count": {
+        "name": "Afspelen aantal hoofdstukken"
+      },
+      "playback_title": {
+        "name": "Afspelen titelnummer"
+      },
+      "playback_title_count": {
+        "name": "Afspelen aantal titels"
+      },
+      "playback_elapsed": {
+        "name": "Afspelen verstreken"
+      },
+      "playback_remaining": {
+        "name": "Afspelen resterend"
+      },
+      "audio_format": {
+        "name": "Audio formaat"
+      },
+      "audio_channels": {
+        "name": "Audio kanalen"
+      },
+      "audio_sample_rate": {
+        "name": "Audio samplefrequentie"
+      },
+      "audio_language": {
+        "name": "Audio taal"
+      },
+      "audio_language_secondary": {
+        "name": "Audio taal (tweede)"
+      },
+      "subtitle_language": {
+        "name": "Ondertiteling taal"
+      }
+    },
+    "number": {
+      "audio_output_level": {
+        "name": "Audio uitgangsniveau"
+      },
+      "audio_maximum_volume": {
+        "name": "Audio maximaal volume"
+      },
+      "video_brightness": {
+        "name": "Video helderheid"
+      },
+      "video_contrast": {
+        "name": "Video contrast"
+      },
+      "video_hue": {
+        "name": "Video tint"
+      },
+      "video_saturation": {
+        "name": "Video verzadiging"
+      }
+    },
+    "select": {
+      "video_resolution": {
+        "name": "Video resolutie",
+        "state": {
+          "auto": "Auto",
+          "480i_576i": "480i/576i",
+          "480p_576p": "480p/576p",
+          "720p": "720p",
+          "1080i": "1080i",
+          "1080p": "1080p"
+        }
+      },
+      "video_aspect_ratio": {
+        "name": "Video beeldverhouding",
+        "state": {
+          "wide_16_9": "16:9 Wide",
+          "wide_auto_16_9": "16:9 Wide/Auto",
+          "pan_scan_4_3": "4:3 Pan & Scan",
+          "letterbox_4_3": "4:3 Letterbox"
+        }
+      },
+      "video_tv_system": {
+        "name": "Video tv-systeem",
+        "state": {
+          "ntsc": "NTSC",
+          "pal": "PAL",
+          "multi": "Multisysteem"
+        }
+      },
+      "video_color_space": {
+        "name": "Video HDMI-kleurruimte",
+        "state": {
+          "rgb_video": "RGB videoniveau",
+          "rgb_pc": "RGB pc-niveau",
+          "ycbcr_444": "YCbCr 4:4:4",
+          "ycbcr_422": "YCbCr 4:2:2"
+        }
+      },
+      "video_deep_color": {
+        "name": "Video HDMI deep color",
+        "state": {
+          "bit_48": "48 bit",
+          "bit_36": "36 bit",
+          "bit_30": "30 bit",
+          "off": "Uit (24 bit)"
+        }
+      },
+      "audio_hdmi_format": {
+        "name": "Audio HDMI-formaat",
+        "state": {
+          "stereo": "Stereo",
+          "lpcm": "LPCM",
+          "bitstream": "Bitstream"
+        }
+      },
+      "audio_coaxial_output": {
+        "name": "Audio coaxiale uitgang",
+        "state": {
+          "lpcm_48k": "48k LPCM",
+          "lpcm_96k": "96k LPCM",
+          "lpcm_192k": "192k LPCM",
+          "bitstream": "Bitstream"
+        }
+      },
+      "audio_dynamic_range": {
+        "name": "Audio dynamiekcompressie",
+        "state": {
+          "auto": "Auto",
+          "on": "Aan",
+          "off": "Uit"
+        }
+      },
+      "audio_speaker_configuration": {
+        "name": "Audio luidsprekerconfiguratie",
+        "state": {
+          "lt_rt": "Lt/Rt",
+          "stereo": "Stereo",
+          "ch_2_1": "2.1",
+          "ch_3_1": "3.1",
+          "ch_5_1": "5.1",
+          "ch_7_1": "7.1"
+        }
+      },
+      "system_time_display": {
+        "name": "Systeem tijdweergave",
+        "state": {
+          "track_elapsed": "Hoofdstuk verstreken",
+          "track_remaining": "Hoofdstuk resterend",
+          "total_elapsed": "Totaal verstreken",
+          "total_remaining": "Totaal resterend"
+        }
+      },
+      "system_remote_code": {
+        "name": "Systeem afstandsbedieningscode",
+        "state": {
+          "code_1": "Code 1",
+          "code_2": "Code 2",
+          "code_3": "Code 3"
+        }
+      }
+    },
+    "switch": {
+      "system_auto_play": {
+        "name": "Systeem automatisch afspelen"
+      },
+      "system_auto_resume": {
+        "name": "Systeem automatisch hervatten"
+      },
+      "system_on_screen_display": {
+        "name": "Systeem schermweergave (OSD)"
+      },
+      "system_ir_remote_sensor": {
+        "name": "Systeem IR-ontvanger"
+      },
+      "system_hdmi_cec": {
+        "name": "Systeem HDMI CEC"
+      },
+      "system_program_mode": {
+        "name": "Systeem programmamodus"
+      },
+      "video_1080p24_conversion": {
+        "name": "Video 1080p24-conversie"
+      },
+      "video_3d_output": {
+        "name": "Video 3D-uitgang"
+      },
+      "video_pip_mark": {
+        "name": "Video PIP-markering"
+      },
+      "audio_secondary_audio_mark": {
+        "name": "Audio markering tweede audio"
+      }
+    },
+    "button": {
+      "disc_eject": {
+        "name": "Disc uitwerpen"
+      },
+      "disc_close_tray": {
+        "name": "Disc lade sluiten"
+      },
+      "menu_home": {
+        "name": "Menu start"
+      },
+      "menu_top": {
+        "name": "Menu disc-hoofdmenu"
+      },
+      "menu_popup": {
+        "name": "Menu pop-up"
+      },
+      "menu_option": {
+        "name": "Menu opties"
+      },
+      "menu_setup": {
+        "name": "Menu instellingen"
+      },
+      "menu_return": {
+        "name": "Menu terug"
+      },
+      "navigation_up": {
+        "name": "Navigatie omhoog"
+      },
+      "navigation_down": {
+        "name": "Navigatie omlaag"
+      },
+      "navigation_left": {
+        "name": "Navigatie links"
+      },
+      "navigation_right": {
+        "name": "Navigatie rechts"
+      },
+      "navigation_enter": {
+        "name": "Navigatie OK"
+      },
+      "playback_audio_primary": {
+        "name": "Afspelen audiospoor"
+      },
+      "playback_audio_secondary": {
+        "name": "Afspelen tweede audio"
+      },
+      "playback_subtitle": {
+        "name": "Afspelen ondertiteling"
+      },
+      "playback_angle": {
+        "name": "Afspelen camerahoek"
+      },
+      "playback_next_title": {
+        "name": "Afspelen volgende titel"
+      },
+      "playback_previous_title": {
+        "name": "Afspelen vorige titel"
+      },
+      "playback_pip_mode": {
+        "name": "Afspelen PIP-modus"
+      },
+      "playback_display_info": {
+        "name": "Afspelen info tonen"
+      },
+      "color_red": {
+        "name": "Kleur rood"
+      },
+      "color_green": {
+        "name": "Kleur groen"
+      },
+      "color_blue": {
+        "name": "Kleur blauw"
+      },
+      "color_yellow": {
+        "name": "Kleur geel"
+      },
+      "system_panel_lock": {
+        "name": "Systeem frontpaneel vergrendelen"
+      },
+      "system_panel_unlock": {
+        "name": "Systeem frontpaneel ontgrendelen"
+      }
+    }
+  }
+}

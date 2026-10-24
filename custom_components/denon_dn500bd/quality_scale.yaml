@@ -1,0 +1,33 @@
+# Self-assessment against the Home Assistant quality scale (Bronze rules).
+# Custom integrations are not graded by Home Assistant; this documents alignment.
+rules:
+  action-setup:
+    status: exempt
+    comment: The integration does not register custom actions.
+  appropriate-polling:
+    status: done
+    comment: Light status poll every 10 s (configurable), settings every 60 s, player pushes changes.
+  brands: done
+  common-modules: done
+  config-flow-test-coverage: done
+  config-flow: done
+  dependency-transparency:
+    status: exempt
+    comment: No external requirements; the protocol client is part of the integration.
+  docs-actions:
+    status: exempt
+    comment: The integration does not register custom actions.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  entity-event-setup:
+    status: done
+    comment: Entities use the coordinator; pushed status is handled by the coordinator.
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure: done
+  test-before-setup:
+    status: exempt
+    comment: A switched off player is a normal state; setup succeeds and the Connection sensor shows offline with the reason.
+  unique-config-entry: done
