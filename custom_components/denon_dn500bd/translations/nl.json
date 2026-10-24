@@ -42,10 +42,12 @@
         "title": "Opties",
         "data": {
           "poll_interval": "Interval statuscontrole",
+          "power_on_entity": "Entiteit voor aanzetten",
           "reprobe": "Ondersteunde functies opnieuw herkennen"
         },
         "data_description": {
           "poll_interval": "Seconden tussen lichte statuscontroles. De speler meldt wijzigingen ook zelf, een kort interval is dus niet nodig.",
+          "power_on_entity": "De speler zet zijn netwerkpoort uit in standby en kan dus niet via het netwerk worden aangezet. Kies een script, schakelaar of knop die hem aanzet (IR-blaster, RS-232-gateway, ...). Laat leeg om de aan-knop te verbergen.",
           "reprobe": "Gebruik dit na een firmware-update. De entiteiten worden opnieuw opgebouwd zodra de speler antwoordt."
         }
       }
@@ -64,9 +66,9 @@
             "name": "Reden",
             "state": {
               "starting": "Opstarten",
-              "connection_refused": "Verbinding geweigerd (standby, of een andere controller is verbonden)",
-              "connect_timeout": "Geen antwoord (uit of verkeerd adres)",
-              "host_unreachable": "Netwerk onbereikbaar",
+              "connection_refused": "Verbinding geweigerd (een andere controller is verbonden)",
+              "connect_timeout": "Geen antwoord (standby, uit of verkeerd adres)",
+              "host_unreachable": "Niet op het netwerk (standby, of geen route)",
               "no_response": "Speler reageert niet (standby, of netwerk vastgelopen)",
               "connection_lost": "Verbinding verbroken",
               "network_error": "Netwerkfout"

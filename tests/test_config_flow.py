@@ -12,6 +12,7 @@ from custom_components.denon_dn500bd.const import (
     CONF_CAPABILITIES,
     CONF_MODEL_ID,
     CONF_POLL_INTERVAL,
+    CONF_POWER_ON_ENTITY,
     CONF_REPROBE,
     CONF_SW_VERSION,
     DOMAIN,
@@ -42,7 +43,7 @@ async def test_user_flow(hass: HomeAssistant, player: FakePlayer) -> None:
         result["flow_id"], {CONF_HOST: "127.0.0.1", CONF_PORT: player.port}
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["title"] == "DN-500BD MKII"
+    assert result["title"] == "Denon DN-500BD MKII"
     data = result["data"]
     assert data[CONF_HOST] == "127.0.0.1"
     assert data[CONF_PORT] == player.port
@@ -144,10 +145,11 @@ async def test_options_flow(hass: HomeAssistant, player: FakePlayer) -> None:
     assert result["step_id"] == "init"
 
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {CONF_POLL_INTERVAL: 15, CONF_REPROBE: True}
+        result["flow_id"],
+        {CONF_POLL_INTERVAL: 15, CONF_POWER_ON_ENTITY: "script.denon_on", CONF_REPROBE: True},
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert entry.options == {CONF_POLL_INTERVAL: 15}
+    assert entry.options == {CONF_POLL_INTERVAL: 15, CONF_POWER_ON_ENTITY: "script.denon_on"}
     assert entry.data[CONF_CAPABILITIES] is None
 
 

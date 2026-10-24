@@ -20,7 +20,7 @@ import logging
 import time
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -204,6 +204,8 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
         self._was_online = False
         self._task: asyncio.Task[None] | None = None
         self._stopping = False
+        self._offline_since: float | None = None
+        self._power_on_until = 0.0
 
     @property
     def poll_interval(self) -> float:
@@ -218,7 +220,7 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
         try:
             # Keep setup short: status and media now, settings right after.
             async with asyncio.timeout(const.FIRST_ATTEMPT_TIMEOUT):
-                await self._try_connect(full=False)
+                await self._try_connect(full=False, probe=False)
         except TimeoutError:
             await self.client.close()
             self._set_offline(const.REASON_NO_RESPONSE)
@@ -240,11 +242,19 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
         await super().async_shutdown()
 
     async def _run(self) -> None:
-        """Poll while online, retry with back-off while offline. Never gives up."""
-        delay = const.RETRY_FIRST
+        """Poll while online, retry while offline. Never gives up."""
         while True:
             try:
                 if self.client.connected and self.data.online:
+                    if self.capabilities is None:
+                        # Probed here, once setup has finished; the entry then
+                        # reloads with the result.
+                        if self.config_entry.state is not ConfigEntryState.LOADED:
+                            await asyncio.sleep(1)
+                            continue
+                        await asyncio.sleep(1)
+                        await self._probe_and_store()
+                        continue
                     if not self._full_due:
                         await self._wait(self.poll_interval)
                     if not self.client.connected:
@@ -258,13 +268,9 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
                 if self._quick_check:
                     self._quick_check = False
                     if await self._try_connect(full=False):
-                        delay = const.RETRY_FIRST
                         continue
-                await self._wait(delay)
-                if await self._try_connect(full=True):
-                    delay = const.RETRY_FIRST
-                else:
-                    delay = min(const.RETRY_MAX, delay * const.RETRY_FACTOR)
+                await self._wait(self._retry_delay())
+                await self._try_connect(full=True)
             except DenonConnectionError as err:
                 await self._connection_failed(err)
             except Exception:  # noqa: BLE001 - keep the loop alive, but say so
@@ -273,6 +279,18 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
                     _LOGGER.exception("Unexpected error talking to %s", self.client.host)
                 await self._recover()
                 await asyncio.sleep(const.RETRY_FIRST)
+
+    def _retry_delay(self) -> float:
+        """Seconds until the next small request while offline."""
+        now = time.monotonic()
+        if now < self._power_on_until:
+            return const.RETRY_POWER_ON
+        offline_for = now - (self._offline_since or now)
+        if offline_for < const.FAST_RETRY_PERIOD:
+            return const.RETRY_FIRST
+        if offline_for < const.MIDDLE_RETRY_PERIOD:
+            return const.RETRY_MIDDLE
+        return const.RETRY_MAX
 
     async def _recover(self) -> None:
         """After an unexpected error: close and show offline, without killing the loop."""
@@ -302,17 +320,17 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
             pass
         self._wake.clear()
 
-    async def _try_connect(self, *, full: bool) -> bool:
+    async def _try_connect(self, *, full: bool, probe: bool = True) -> bool:
         """Connect and send one small request; refresh when it answers."""
         async with self._connect_lock:
-            return await self._try_connect_locked(full=full)
+            return await self._try_connect_locked(full=full, probe=probe)
 
-    async def _try_connect_locked(self, *, full: bool) -> bool:
+    async def _try_connect_locked(self, *, full: bool, probe: bool) -> bool:
         try:
             if not self.client.connected:
                 await self.client.connect()
             await self.client.request("?PW")
-            if self.capabilities is None:
+            if probe and self.capabilities is None:
                 await self._probe_and_store()
             await self._poll(full=full)
         except DenonConnectionError as err:
@@ -433,6 +451,8 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
         if self._was_online:
             _LOGGER.info("Denon player at %s is back online", self.client.host)
         self._was_online = True
+        self._offline_since = None
+        self._power_on_until = 0.0
         self._unexpected_logged = False
         self._details_due = True
         self.data.online = True
@@ -441,6 +461,8 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
     @callback
     def _set_offline(self, reason: str) -> None:
         """Mark the player offline (a state, not an error)."""
+        if self._offline_since is None:
+            self._offline_since = time.monotonic()
         if not self.data.online and self.data.reason == reason:
             return
         if self.data.online:
@@ -526,20 +548,27 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
             return
         self.async_set_updated_data(self.data)
 
+    @property
+    def power_on_entity(self) -> str | None:
+        """Entity that powers the player on (its LAN port is off in standby)."""
+        return self.config_entry.options.get(const.CONF_POWER_ON_ENTITY) or None
+
     async def async_turn_on(self) -> None:
-        """Power on. Works only if the LAN port answers while in standby."""
-        if self.client.connected and self.data.online:
+        """Power on through the configured entity, then look for the player quickly."""
+        if self.data.online:
             await self.async_send_command(CMD_POWER_ON)
             return
-        if self._stopping:
+        entity_id = self.power_on_entity
+        if entity_id is None or self._stopping:
+            _LOGGER.debug("No power-on entity configured for %s", self.client.host)
             return
-        async with self._connect_lock:
-            try:
-                await self.client.connect()
-                await self.client.request(CMD_POWER_ON)
-            except DenonConnectionError as err:
-                _LOGGER.debug("Power on via LAN not possible right now (%s)", err.reason)
-            await self.client.close()
-        # Let the connection loop take over straight away.
-        self._quick_check = True
+        domain = entity_id.split(".", 1)[0]
+        service = const.POWER_ON_SERVICES.get(domain)
+        if service is None:
+            _LOGGER.debug("Power-on entity %s has an unsupported domain", entity_id)
+            return
+        await self.hass.services.async_call(
+            domain, service, {"entity_id": entity_id}, blocking=True
+        )
+        self._power_on_until = time.monotonic() + const.POWER_ON_WINDOW
         self._wake.set()

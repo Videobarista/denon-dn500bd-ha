@@ -21,11 +21,17 @@ def entity_id(hass: HomeAssistant, entry: MockConfigEntry, platform: str, key: s
     return result
 
 
-def make_entry(port: int, capabilities: list[str] | None = ALL_CAPABILITIES) -> MockConfigEntry:
+def make_entry(
+    port: int,
+    capabilities: list[str] | None = ALL_CAPABILITIES,
+    *,
+    title: str = const.DEFAULT_TITLE,
+    options: dict | None = None,
+) -> MockConfigEntry:
     """A config entry for the fake player."""
     return MockConfigEntry(
         domain=const.DOMAIN,
-        title="DN-500BD MKII",
+        title=title,
         unique_id="127.0.0.1",
         data={
             CONF_HOST: "127.0.0.1",
@@ -34,7 +40,7 @@ def make_entry(port: int, capabilities: list[str] | None = ALL_CAPABILITIES) -> 
             const.CONF_MODEL_ID: "DN-500BDUS",
             const.CONF_SW_VERSION: "00004072",
         },
-        options={const.CONF_POLL_INTERVAL: 0.2},
+        options={const.CONF_POLL_INTERVAL: 0.2, **(options or {})},
     )
 
 

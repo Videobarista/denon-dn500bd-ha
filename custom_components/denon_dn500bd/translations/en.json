@@ -42,10 +42,12 @@
         "title": "Options",
         "data": {
           "poll_interval": "Status poll interval",
+          "power_on_entity": "Power-on entity",
           "reprobe": "Detect supported features again"
         },
         "data_description": {
           "poll_interval": "Seconds between light status polls. The player also pushes changes itself, so a short interval is not needed.",
+          "power_on_entity": "The player switches its network port off in standby, so it cannot be powered on over the network. Pick a script, switch or button that powers it on (IR blaster, RS-232 gateway, ...). Leave empty to hide the power-on button.",
           "reprobe": "Use after a firmware update. The entities are rebuilt the next time the player answers."
         }
       }
@@ -64,9 +66,9 @@
             "name": "Reason",
             "state": {
               "starting": "Starting",
-              "connection_refused": "Connection refused (standby, or another controller is connected)",
-              "connect_timeout": "No answer (switched off or wrong address)",
-              "host_unreachable": "Network unreachable",
+              "connection_refused": "Connection refused (another controller is connected)",
+              "connect_timeout": "No answer (standby, switched off or wrong address)",
+              "host_unreachable": "Not on the network (standby, or no route)",
               "no_response": "Player does not respond (standby, or its network is stuck)",
               "connection_lost": "Connection lost",
               "network_error": "Network error"

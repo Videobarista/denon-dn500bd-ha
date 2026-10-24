@@ -10,7 +10,7 @@ from __future__ import annotations
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_CAPABILITIES
+from .const import CONF_CAPABILITIES, DEFAULT_TITLE, OLD_DEFAULT_TITLE
 from .coordinator import DenonConfigEntry, DenonCoordinator
 
 PLATFORMS: list[Platform] = [
@@ -25,6 +25,8 @@ PLATFORMS: list[Platform] = [
 
 async def async_setup_entry(hass: HomeAssistant, entry: DenonConfigEntry) -> bool:
     """Set up the player. Never fails because the player is switched off."""
+    if entry.title == OLD_DEFAULT_TITLE:
+        hass.config_entries.async_update_entry(entry, title=DEFAULT_TITLE)
     coordinator = DenonCoordinator(hass, entry)
     entry.runtime_data = coordinator
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
@@ -44,4 +46,4 @@ async def _async_update_listener(hass: HomeAssistant, entry: DenonConfigEntry) -
     caps = entry.data.get(CONF_CAPABILITIES)
     current = (dict(entry.options), None if caps is None else list(caps))
     if current != coordinator.setup_snapshot:
-        await hass.config_entries.async_reload(entry.entry_id)
+        hass.config_entries.async_schedule_reload(entry.entry_id)

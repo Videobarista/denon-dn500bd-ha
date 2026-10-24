@@ -19,14 +19,16 @@ from .const import (
     CONF_CAPABILITIES,
     CONF_MODEL_ID,
     CONF_POLL_INTERVAL,
+    CONF_POWER_ON_ENTITY,
     CONF_REPROBE,
     CONF_SW_VERSION,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_PORT,
+    DEFAULT_TITLE,
     DOMAIN,
     MAX_POLL_INTERVAL,
     MIN_POLL_INTERVAL,
-    MODEL,
+    POWER_ON_SERVICES,
 )
 from .coordinator import DenonConfigEntry, ProbeResult, async_probe_player
 
@@ -80,14 +82,14 @@ class DenonConfigFlow(ConfigFlow, domain=DOMAIN):
                 if user_input.get(CONF_ADD_OFFLINE):
                     # Capabilities are probed the first time the player answers.
                     data[CONF_CAPABILITIES] = None
-                    return self.async_create_entry(title=MODEL, data=data)
+                    return self.async_create_entry(title=DEFAULT_TITLE, data=data)
                 errors["base"] = "cannot_connect"
             else:
                 data[CONF_CAPABILITIES] = result.capabilities
                 data[CONF_MODEL_ID] = result.model_id
                 data[CONF_SW_VERSION] = result.sw_version
                 await asyncio.sleep(_RELEASE_DELAY)
-                return self.async_create_entry(title=MODEL, data=data)
+                return self.async_create_entry(title=DEFAULT_TITLE, data=data)
         return self.async_show_form(
             step_id="user", data_schema=_user_schema(user_input or {}), errors=errors
         )
@@ -153,7 +155,7 @@ class DenonConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class DenonOptionsFlow(OptionsFlow):
-    """Poll interval and re-probing of the supported features."""
+    """Poll interval, power-on entity and re-probing of the supported features."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Manage the options."""
@@ -178,6 +180,12 @@ class DenonOptionsFlow(OptionsFlow):
                         mode=selector.NumberSelectorMode.BOX,
                         unit_of_measurement="s",
                     )
+                ),
+                vol.Optional(
+                    CONF_POWER_ON_ENTITY,
+                    description={"suggested_value": entry.options.get(CONF_POWER_ON_ENTITY)},
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=list(POWER_ON_SERVICES))
                 ),
                 vol.Optional(CONF_REPROBE, default=False): bool,
             }

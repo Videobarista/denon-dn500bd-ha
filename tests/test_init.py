@@ -6,10 +6,12 @@ import asyncio
 import logging
 
 import pytest
+from pytest_homeassistant_custom_component.common import async_mock_service
 
-from custom_components.denon_dn500bd.const import CONF_CAPABILITIES
+from custom_components.denon_dn500bd.const import CONF_CAPABILITIES, CONF_POWER_ON_ENTITY
 from custom_components.denon_dn500bd.coordinator import DenonCoordinator
 from custom_components.denon_dn500bd.diagnostics import async_get_config_entry_diagnostics
+from homeassistant.components.media_player import MediaPlayerEntityFeature
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import STATE_OFF, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
@@ -63,9 +65,6 @@ async def test_player_off_is_a_state_not_an_error(
         player_id = entity_id(hass, entry, "media_player", "media_player")
         await hass.services.async_call(
             "media_player", "media_play", {"entity_id": player_id}, blocking=True
-        )
-        await hass.services.async_call(
-            "media_player", "turn_on", {"entity_id": player_id}, blocking=True
         )
         assert not _integration_problems(caplog)
     finally:
@@ -181,7 +180,54 @@ def test_no_accidental_coordinator_overrides() -> None:
     base = set(dir(DataUpdateCoordinator))
     overridden = {
         name
-        for name in vars(DenonCoordinator)
-        if name in base and name not in allowed and not name.startswith("__")
+        for name, value in vars(DenonCoordinator).items()
+        if (callable(value) or isinstance(value, property)) and name in base and name not in allowed
     }
     assert not overridden
+
+
+async def test_old_title_is_renamed(hass: HomeAssistant) -> None:
+    """Entries created by v1.0.x get the full name."""
+    entry = make_entry(free_port(), title="DN-500BD MKII")
+    await setup_entry(hass, entry)
+    try:
+        assert entry.title == "Denon DN-500BD MKII"
+    finally:
+        await unload_entry(hass, entry)
+
+
+async def test_no_power_on_without_entity(hass: HomeAssistant) -> None:
+    """The network port is off in standby: no power-on button by default."""
+    entry = make_entry(free_port())
+    await setup_entry(hass, entry)
+    try:
+        state = hass.states.get(entity_id(hass, entry, "media_player", "media_player"))
+        features = state.attributes["supported_features"]
+        assert not features & MediaPlayerEntityFeature.TURN_ON
+        assert features & MediaPlayerEntityFeature.TURN_OFF
+    finally:
+        await unload_entry(hass, entry)
+
+
+async def test_power_on_through_entity(hass: HomeAssistant) -> None:
+    """Turn on runs the configured entity and then looks for the player quickly."""
+    calls = async_mock_service(hass, "script", "turn_on")
+    port = free_port()
+    entry = make_entry(port, options={CONF_POWER_ON_ENTITY: "script.denon_on"})
+    await setup_entry(hass, entry)
+    player_id = entity_id(hass, entry, "media_player", "media_player")
+    fake = FakePlayer()
+    try:
+        state = hass.states.get(player_id)
+        assert state.state == STATE_OFF
+        assert state.attributes["supported_features"] & MediaPlayerEntityFeature.TURN_ON
+        await hass.services.async_call(
+            "media_player", "turn_on", {"entity_id": player_id}, blocking=True
+        )
+        assert len(calls) == 1
+        assert calls[0].data["entity_id"] == "script.denon_on"
+        await fake.start(port)
+        await wait_for(lambda: hass.states.get(player_id).state == "playing")
+    finally:
+        await unload_entry(hass, entry)
+        await fake.stop()

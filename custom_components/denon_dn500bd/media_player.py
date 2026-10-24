@@ -32,8 +32,7 @@ from .entity import DenonEntity
 PARALLEL_UPDATES = 1
 
 _BASE_FEATURES = (
-    MediaPlayerEntityFeature.TURN_ON
-    | MediaPlayerEntityFeature.TURN_OFF
+    MediaPlayerEntityFeature.TURN_OFF
     | MediaPlayerEntityFeature.PLAY
     | MediaPlayerEntityFeature.PAUSE
     | MediaPlayerEntityFeature.STOP
@@ -67,6 +66,10 @@ class DenonMediaPlayer(DenonEntity, MediaPlayerEntity):
         features = _BASE_FEATURES
         if CAP_MUTE in (coordinator.capabilities or ()):
             features |= MediaPlayerEntityFeature.VOLUME_MUTE
+        # The player's network port is off in standby: power on only works
+        # through an entity configured in the options (IR, RS-232, plug ...).
+        if coordinator.power_on_entity:
+            features |= MediaPlayerEntityFeature.TURN_ON
         self._attr_supported_features = features
 
     @property
@@ -140,7 +143,7 @@ class DenonMediaPlayer(DenonEntity, MediaPlayerEntity):
         return self.coordinator.data.position_updated_at
 
     async def async_turn_on(self) -> None:
-        """Power on (only works if the LAN port answers in standby)."""
+        """Power on through the configured power-on entity."""
         await self.coordinator.async_turn_on()
 
     async def async_turn_off(self) -> None:
