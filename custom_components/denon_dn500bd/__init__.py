@@ -10,7 +10,7 @@ from __future__ import annotations
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_CAPABILITIES, DEFAULT_TITLE, OLD_DEFAULT_TITLE
+from .const import DEFAULT_TITLE, OLD_DEFAULT_TITLE
 from .coordinator import DenonConfigEntry, DenonCoordinator
 
 PLATFORMS: list[Platform] = [
@@ -41,9 +41,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: DenonConfigEntry) -> bo
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: DenonConfigEntry) -> None:
-    """Reload when the options or the cached capabilities changed."""
-    coordinator = entry.runtime_data
-    caps = entry.data.get(CONF_CAPABILITIES)
-    current = (dict(entry.options), None if caps is None else list(caps))
-    if current != coordinator.setup_snapshot:
+    """Reload when the options or the data (address, capability cache) changed."""
+    if (dict(entry.options), dict(entry.data)) != entry.runtime_data.setup_snapshot:
         hass.config_entries.async_schedule_reload(entry.entry_id)

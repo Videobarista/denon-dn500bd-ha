@@ -37,9 +37,10 @@ DEFAULT_POLL_INTERVAL: Final = 10
 MIN_POLL_INTERVAL: Final = 5
 MAX_POLL_INTERVAL: Final = 60
 
-# Settings (mute, picture, audio ...) are re-read at this interval; the light
-# status poll runs every poll interval and the player pushes changes itself.
-FULL_REFRESH_INTERVAL: Final = 60.0
+# Settings (mute, picture, audio ...) are re-read at this interval; a change
+# made from Home Assistant is read back at once. The light status poll runs
+# every poll interval and the player pushes status changes itself.
+FULL_REFRESH_INTERVAL: Final = 300.0
 
 # Timing (module attributes so the tests can shorten them).
 CONNECT_TIMEOUT: Final = 5.0

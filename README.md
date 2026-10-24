@@ -22,12 +22,14 @@ media player from Home Assistant over Ethernet (TCP port 9030).
 ## Features
 
 - **Media player** with play, pause, stop, next/previous chapter, power off,
-  power on through an entity of your choice (see [Power on](#power-on)), mute, title/artist/album (CD text and file tags) and the position and
-  length of the current chapter or track.
+  power on through an entity of your choice (see [Power on](#power-on)),
+  mute, title/artist/album (CD text and file tags) and the position and
+  length of the current title.
 - **Push updates**: the player reports status changes itself (play/pause,
   chapter, tray); a light poll (default every 10 s) keeps the time code in
-  step. The media position is extrapolated by Home Assistant, so a playing
-  disc does not write a new state every few seconds.
+  step and the settings are re-read every 5 minutes. The media position is
+  extrapolated by Home Assistant, so a playing disc does not write a new
+  state every few seconds.
 - **Sensors**: connection (with the reason when offline), disc status, disc
   type, playback status, chapter / title numbers, audio format, channels,
   sample rate, audio and subtitle language, elapsed/remaining time, last seen.
@@ -146,7 +148,7 @@ Other questions:
 | --- | --- |
 | Play, pause or next does nothing | The player refuses commands during unskippable disc content (warnings, trailers) and in some disc menus. This is expected and only logged at debug level. |
 | No title for Blu-ray or DVD | Discs do not report a title; only CD text and file tags (USB/SD) do. |
-| Position starts again at 0 | Position and length are those of the current chapter (DVD/BD) or track (CD/files), as reported by the player. |
+| Position and length look odd | They are those of the current title, as reported by the player: in a disc menu or between titles they start again. |
 | A setting entity is missing | It is disabled by default (enable it), or your player did not report it during the probe: use **Detect supported features again** with the player switched on. |
 | A select shows `unknown` | The player reports a value that is not in the documented list (for example video resolution `7`). |
 
@@ -171,8 +173,9 @@ differs from the RS-232 description:
   followed by the answer (`@0STPL`, `0000113`, `error`, `unknow`).
 - Status changes are pushed by the player (each one twice) and can arrive
   before or after the reply to a request.
-- `?ET` / `?RM` answer `hhhmmss` without the `@0ET` prefix; the integration
-  converts them to seconds for Home Assistant.
+- `?ET` / `?RM` answer `hhhmmss` without the `@0ET` prefix and give the
+  elapsed / remaining time of the current title; the integration converts
+  them to seconds for Home Assistant.
 - Several settings that the guide lists as write-only can also be read back
   (mute, output level, picture, audio and video settings); those are what the
   capability probe looks for.

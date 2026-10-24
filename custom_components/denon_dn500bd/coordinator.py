@@ -55,7 +55,7 @@ _LOGGER = logging.getLogger(__name__)
 type DenonConfigEntry = ConfigEntry[DenonCoordinator]
 
 # Pushed codes after which the media details are re-read.
-_DETAIL_TRIGGERS = {"ST", "CD", "Tr", "Tt", "PCGp", "PCTG"}
+_DETAIL_TRIGGERS = {"ST", "CD", "Tr", "Tt"}
 # Seconds the reported position may differ from the extrapolated one.
 _POSITION_TOLERANCE = 2.5
 # Answers meaning "no value".
@@ -117,17 +117,17 @@ class DenonData:
 
     @property
     def elapsed(self) -> int | None:
-        """Elapsed time of the current chapter/track in seconds."""
+        """Elapsed time of the current title in seconds."""
         return parse_hhhmmss(self.values.get("ET"))
 
     @property
     def remaining(self) -> int | None:
-        """Remaining time of the current chapter/track in seconds."""
+        """Remaining time of the current title in seconds."""
         return parse_hhhmmss(self.values.get("RM"))
 
     @property
     def duration(self) -> int | None:
-        """Length of the current chapter/track in seconds (elapsed + remaining)."""
+        """Length of the current title in seconds (elapsed + remaining)."""
         elapsed, remaining = self.elapsed, self.remaining
         if elapsed is None or remaining is None or elapsed + remaining == 0:
             return None
@@ -187,16 +187,17 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
         caps = entry.data.get(const.CONF_CAPABILITIES)
         self.capabilities: set[str] | None = None if caps is None else set(caps)
         # What this instance was set up with; the update listener reloads
-        # the entry when the options or the capability cache change.
-        self.setup_snapshot: tuple[dict[str, Any], list[str] | None] = (
+        # the entry when the options or the data change.
+        self.setup_snapshot: tuple[dict[str, Any], dict[str, Any]] = (
             dict(entry.options),
-            None if caps is None else list(caps),
+            dict(entry.data),
         )
         self.data = DenonData()
         self._wake = asyncio.Event()
         self._connect_lock = asyncio.Lock()
         self._poll_handle: asyncio.TimerHandle | None = None
         self._quick_check = False
+        self._polling = False
         self._details_due = True
         self._full_due = True
         self._last_full = 0.0
@@ -362,22 +363,28 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
     # --- polling --------------------------------------------------------------
     async def _poll(self, *, full: bool) -> None:
         """Read the status; stops at the first request that gets no answer."""
-        for command in POLL_STATUS:
-            await self._query(command)
-        if self.data.media_present:
-            for command in POLL_MEDIA:
+        # Changes seen in our own replies are handled within this poll; they
+        # must not schedule yet another poll.
+        self._polling = True
+        try:
+            for command in POLL_STATUS:
                 await self._query(command)
-            if full or self._details_due:
-                self._details_due = False
-                for command in POLL_DETAILS:
+            if self.data.media_present:
+                for command in POLL_MEDIA:
                     await self._query(command)
-        else:
-            self._clear_media()
-        if full:
-            for code in sorted(self.capabilities or ()):
-                await self._query("?" + code)
-            self._last_full = time.monotonic()
-            self._full_due = False
+                if full or self._details_due:
+                    self._details_due = False
+                    for command in POLL_DETAILS:
+                        await self._query(command)
+            else:
+                self._clear_media()
+            if full:
+                for code in sorted(self.capabilities or ()):
+                    await self._query("?" + code)
+                self._last_full = time.monotonic()
+                self._full_due = False
+        finally:
+            self._polling = False
         self._mark_seen()
         self.async_set_updated_data(self.data)
 
@@ -493,7 +500,8 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
                     details = True
         if details:
             self._details_due = True
-            self._schedule_poll(const.REFRESH_DELAY_PUSH)
+            if not self._polling:
+                self._schedule_poll(const.REFRESH_DELAY_PUSH)
         if changed and self.data.online:
             self.async_set_updated_data(self.data)
 

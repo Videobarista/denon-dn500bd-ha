@@ -6,7 +6,7 @@ rules:
     comment: The integration does not register custom actions.
   appropriate-polling:
     status: done
-    comment: Light status poll every 10 s (configurable), settings every 60 s, player pushes changes.
+    comment: Light status poll every 10 s (configurable), settings every 5 minutes, player pushes changes.
   brands: done
   common-modules: done
   config-flow-test-coverage: done

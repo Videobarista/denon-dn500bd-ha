@@ -53,9 +53,9 @@ async def async_setup_entry(
 class DenonMediaPlayer(DenonEntity, MediaPlayerEntity):
     """The player itself.
 
-    Position and duration are those of the current chapter (DVD/BD) or track
-    (CD/files), as the player reports them; the position is only re-anchored
-    when it jumps so a playing disc does not cause a state write every poll.
+    Position and duration are those of the current title, as the player
+    reports them (``?ET``/``?RM``); the position is only re-anchored when it
+    jumps, so a playing disc does not cause a state write on every poll.
     """
 
     _attr_name = None
@@ -129,12 +129,12 @@ class DenonMediaPlayer(DenonEntity, MediaPlayerEntity):
 
     @property
     def media_duration(self) -> int | None:
-        """Length of the current chapter/track in seconds."""
+        """Length of the current title in seconds."""
         return self.coordinator.data.duration
 
     @property
     def media_position(self) -> int | None:
-        """Position in the current chapter/track in seconds."""
+        """Position in the current title in seconds."""
         return self.coordinator.data.position
 
     @property

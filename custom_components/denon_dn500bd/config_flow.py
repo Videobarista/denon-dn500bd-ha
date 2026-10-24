@@ -106,8 +106,9 @@ class DenonConfigFlow(ConfigFlow, domain=DOMAIN):
             if self._address_in_use(host, entry):
                 return self.async_abort(reason="already_configured")
             if host == entry.data[CONF_HOST] and port == entry.data[CONF_PORT]:
-                # Same player: the running integration holds its only connection.
-                return self.async_update_reload_and_abort(entry)
+                # Same player: nothing changes (and the running integration
+                # holds the player's only connection).
+                return self.async_abort(reason="reconfigure_successful")
             try:
                 result = await async_validate(host, port)
             except DenonConnectionError as err:
@@ -115,10 +116,12 @@ class DenonConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "cannot_connect"
             else:
                 await asyncio.sleep(_RELEASE_DELAY)
-                return self.async_update_reload_and_abort(
+                # The integration's update listener reloads the entry.
+                self.hass.config_entries.async_update_entry(
                     entry,
                     unique_id=host.lower(),
-                    data_updates={
+                    data={
+                        **entry.data,
                         CONF_HOST: host,
                         CONF_PORT: port,
                         CONF_CAPABILITIES: result.capabilities,
@@ -126,6 +129,7 @@ class DenonConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_SW_VERSION: result.sw_version,
                     },
                 )
+                return self.async_abort(reason="reconfigure_successful")
         defaults = user_input or {
             CONF_HOST: entry.data[CONF_HOST],
             CONF_PORT: entry.data[CONF_PORT],
