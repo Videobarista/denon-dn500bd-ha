@@ -57,6 +57,14 @@ RETRY_POWER_ON: Final = 5.0
 POWER_ON_WINDOW: Final = 180.0
 FIRST_ATTEMPT_TIMEOUT: Final = 12.0
 
+# Limits that keep a misbehaving (or spoofed) device from hurting Home Assistant
+# and keep Home Assistant from flooding the player.
+MAX_PACKET: Final = 600  # protocol maximum, start and end character included
+READ_CHUNK: Final = 1024
+MAX_BURST: Final = 2048  # real bursts stay well below the protocol maximum
+MAX_VALUE_LENGTH: Final = 64  # protocol: title/artist/album up to 64 characters
+MAX_PENDING_COMMANDS: Final = 10  # control commands waiting for the connection
+
 # The protocol asks for >= 30 ms between commands on the LAN port.
 COMMAND_GAP: Final = 0.04
 # A burst of bytes from the player is complete after this much silence.

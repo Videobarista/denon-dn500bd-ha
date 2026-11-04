@@ -231,3 +231,21 @@ async def test_power_on_through_entity(hass: HomeAssistant) -> None:
     finally:
         await unload_entry(hass, entry)
         await fake.stop()
+
+
+async def test_logs_do_not_contain_the_address(
+    hass: HomeAssistant, player: FakePlayer, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Log messages name the player, not its IP address."""
+    caplog.set_level(logging.DEBUG, logger="custom_components.denon_dn500bd")
+    entry = make_entry(player.port)
+    await setup_entry(hass, entry)
+    connection_id = entity_id(hass, entry, "sensor", "connection")
+    try:
+        await player.stop()
+        await wait_for(lambda: hass.states.get(connection_id).state == "offline")
+    finally:
+        await unload_entry(hass, entry)
+    ours = [r for r in caplog.records if r.name.startswith("custom_components.denon_dn500bd")]
+    assert ours
+    assert not [r for r in ours if "127.0.0.1" in r.getMessage()]

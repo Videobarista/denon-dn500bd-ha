@@ -138,6 +138,10 @@ class FakePlayer:
     def push(self, *messages: str) -> None:
         """Push status messages (twice, like the real player)."""
         payload = "".join(f"@0{m}@0{m}" for m in messages).encode("latin-1")
+        self.send_raw(payload)
+
+    def send_raw(self, payload: bytes) -> None:
+        """Send arbitrary bytes, e.g. garbage from a misbehaving device."""
         for writer in self._writers:
             writer.write(payload)
 

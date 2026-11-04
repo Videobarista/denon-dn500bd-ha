@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
+import re
 from typing import Any
 
 import voluptuous as vol
@@ -38,6 +40,28 @@ _LOGGER = logging.getLogger(__name__)
 # before the integration opens its own.
 _RELEASE_DELAY = 0.5
 
+_HOSTNAME_RE = re.compile(r"(?!-)[A-Za-z0-9_-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9_-]{1,63}(?<!-))*\.?")
+
+
+def normalize_host(value: str) -> str | None:
+    """Return a clean IP address or host name, or None when it is not one.
+
+    Rejects schemes, paths, ports, spaces and other text that is not an
+    address, so only an address ever reaches the network code.
+    """
+    host = value.strip()
+    if host.startswith("[") and host.endswith("]"):
+        host = host[1:-1]
+    if not host or len(host) > 253:
+        return None
+    try:
+        return str(ipaddress.ip_address(host))
+    except ValueError:
+        pass
+    if re.fullmatch(r"[0-9.]+", host):
+        return None  # looks like an IPv4 address but is not a valid one
+    return host if _HOSTNAME_RE.fullmatch(host) else None
+
 
 async def async_validate(host: str, port: int) -> ProbeResult:
     """Connect, probe the player once and disconnect again."""
@@ -70,15 +94,21 @@ class DenonConfigFlow(ConfigFlow, domain=DOMAIN):
         """Ask for the address of the player."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            host = user_input[CONF_HOST].strip()
+            host = normalize_host(user_input[CONF_HOST])
             port = user_input[CONF_PORT]
+            if host is None:
+                return self.async_show_form(
+                    step_id="user",
+                    data_schema=_user_schema(user_input),
+                    errors={CONF_HOST: "invalid_host"},
+                )
             await self.async_set_unique_id(host.lower())
             self._abort_if_unique_id_configured()
             data: dict[str, Any] = {CONF_HOST: host, CONF_PORT: port}
             try:
                 result = await async_validate(host, port)
             except DenonConnectionError as err:
-                _LOGGER.debug("Player %s:%s not reachable: %s", host, port, err)
+                _LOGGER.debug("Player not reachable during setup: %s", err.reason)
                 if user_input.get(CONF_ADD_OFFLINE):
                     # Capabilities are probed the first time the player answers.
                     data[CONF_CAPABILITIES] = None
@@ -101,35 +131,38 @@ class DenonConfigFlow(ConfigFlow, domain=DOMAIN):
         entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
         if user_input is not None:
-            host = user_input[CONF_HOST].strip()
+            host = normalize_host(user_input[CONF_HOST])
             port = user_input[CONF_PORT]
-            if self._address_in_use(host, entry):
+            if host is None:
+                errors[CONF_HOST] = "invalid_host"
+            elif self._address_in_use(host, entry):
                 return self.async_abort(reason="already_configured")
-            if host == entry.data[CONF_HOST] and port == entry.data[CONF_PORT]:
+            elif host == entry.data[CONF_HOST] and port == entry.data[CONF_PORT]:
                 # Same player: nothing changes (and the running integration
                 # holds the player's only connection).
                 return self.async_abort(reason="reconfigure_successful")
-            try:
-                result = await async_validate(host, port)
-            except DenonConnectionError as err:
-                _LOGGER.debug("Player %s:%s not reachable: %s", host, port, err)
-                errors["base"] = "cannot_connect"
             else:
-                await asyncio.sleep(_RELEASE_DELAY)
-                # The integration's update listener reloads the entry.
-                self.hass.config_entries.async_update_entry(
-                    entry,
-                    unique_id=host.lower(),
-                    data={
-                        **entry.data,
-                        CONF_HOST: host,
-                        CONF_PORT: port,
-                        CONF_CAPABILITIES: result.capabilities,
-                        CONF_MODEL_ID: result.model_id,
-                        CONF_SW_VERSION: result.sw_version,
-                    },
-                )
-                return self.async_abort(reason="reconfigure_successful")
+                try:
+                    result = await async_validate(host, port)
+                except DenonConnectionError as err:
+                    _LOGGER.debug("Player not reachable during setup: %s", err.reason)
+                    errors["base"] = "cannot_connect"
+                else:
+                    await asyncio.sleep(_RELEASE_DELAY)
+                    # The integration's update listener reloads the entry.
+                    self.hass.config_entries.async_update_entry(
+                        entry,
+                        unique_id=host.lower(),
+                        data={
+                            **entry.data,
+                            CONF_HOST: host,
+                            CONF_PORT: port,
+                            CONF_CAPABILITIES: result.capabilities,
+                            CONF_MODEL_ID: result.model_id,
+                            CONF_SW_VERSION: result.sw_version,
+                        },
+                    )
+                    return self.async_abort(reason="reconfigure_successful")
         defaults = user_input or {
             CONF_HOST: entry.data[CONF_HOST],
             CONF_PORT: entry.data[CONF_PORT],

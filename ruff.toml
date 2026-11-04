@@ -2,9 +2,13 @@ line-length = 100
 target-version = "py313"
 
 [lint]
-select = ["B", "E", "F", "I", "UP", "W"]
+select = ["B", "E", "F", "I", "S", "UP", "W"]
 
 [lint.isort]
 force-sort-within-sections = true
 known-first-party = ["homeassistant"]
 combine-as-imports = true
+
+[lint.per-file-ignores]
+# Tests use plain asserts.
+"tests/**" = ["S101"]

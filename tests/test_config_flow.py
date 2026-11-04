@@ -164,3 +164,36 @@ async def test_reconfigure_same_address(hass: HomeAssistant) -> None:
     )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
+
+
+@pytest.mark.parametrize("host", ["http://192.0.2.10", "192.0.2.10:9030", "a b", "192.0.2.300"])
+async def test_user_flow_invalid_host(hass: HomeAssistant, host: str) -> None:
+    """Anything that is not an address is refused before any connection."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOST: host, CONF_PORT: 9030}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_HOST: "invalid_host"}
+
+
+async def test_user_flow_normalizes_host(hass: HomeAssistant, player: FakePlayer) -> None:
+    """Spaces around the address are removed."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOST: " 127.0.0.1 ", CONF_PORT: player.port}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_HOST] == "127.0.0.1"
+
+
+async def test_reconfigure_invalid_host(hass: HomeAssistant) -> None:
+    """Reconfigure refuses text that is not an address."""
+    entry = make_entry(free_port())
+    entry.add_to_hass(hass)
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOST: "http://x", CONF_PORT: 9030}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_HOST: "invalid_host"}

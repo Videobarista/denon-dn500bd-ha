@@ -29,9 +29,11 @@ from homeassistant.util import dt as dt_util
 from . import const
 from .api import (
     DenonClient,
+    DenonCommandError,
     DenonConnectionError,
     Reply,
     clean_text,
+    is_digits,
     message_codes,
     parse_hhhmmss,
     split_message,
@@ -142,7 +144,7 @@ def parse_version(payload: str | None) -> tuple[str | None, str | None]:
     """Split the ``?VN`` answer ``00004072DN-500BDUS`` into model and version."""
     if not payload:
         return None, None
-    if len(payload) > 8 and payload[:8].isdigit():
+    if len(payload) > 8 and is_digits(payload[:8]):
         return payload[8:] or None, payload[:8]
     return payload, None
 
@@ -175,12 +177,13 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
             hass,
             _LOGGER,
             config_entry=entry,
-            name=f"{const.DOMAIN} {entry.data[CONF_HOST]}",
+            name=f"{const.DOMAIN} {entry.title}",
             update_interval=None,
         )
         self.client = DenonClient(
             entry.data[CONF_HOST],
             entry.data.get(CONF_PORT, const.DEFAULT_PORT),
+            name=entry.title,
             on_messages=self._handle_messages,
             on_disconnect=self._handle_disconnect,
         )
@@ -205,6 +208,7 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
         self._was_online = False
         self._task: asyncio.Task[None] | None = None
         self._stopping = False
+        self._pending_commands = 0
         self._offline_since: float | None = None
         self._power_on_until = 0.0
 
@@ -226,7 +230,7 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
             await self.client.close()
             self._set_offline(const.REASON_NO_RESPONSE)
         self._task = self.config_entry.async_create_background_task(
-            self.hass, self._run(), f"{const.DOMAIN} connection {self.client.host}"
+            self.hass, self._run(), f"{const.DOMAIN} connection {self.client.name}"
         )
 
     async def async_shutdown(self) -> None:
@@ -277,7 +281,7 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
             except Exception:  # noqa: BLE001 - keep the loop alive, but say so
                 if not self._unexpected_logged:
                     self._unexpected_logged = True
-                    _LOGGER.exception("Unexpected error talking to %s", self.client.host)
+                    _LOGGER.exception("Unexpected error talking to %s", self.client.name)
                 await self._recover()
                 await asyncio.sleep(const.RETRY_FIRST)
 
@@ -300,7 +304,7 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
             self._set_offline(const.REASON_NETWORK)
         except Exception:  # noqa: BLE001 - the loop must keep running
             _LOGGER.debug(
-                "Error while recovering connection to %s", self.client.host, exc_info=True
+                "Error while recovering connection to %s", self.client.name, exc_info=True
             )
 
     async def _connection_failed(self, err: DenonConnectionError) -> None:
@@ -348,7 +352,7 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
         result = await async_probe_player(self.client)
         self.capabilities = set(result.capabilities)
         entry = self.config_entry
-        _LOGGER.debug("Player %s supports %s", self.client.host, result.capabilities)
+        _LOGGER.debug("Player %s supports %s", self.client.name, result.capabilities)
         # The update listener reloads the entry so the new entities appear.
         self.hass.config_entries.async_update_entry(
             entry,
@@ -410,6 +414,9 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
 
     # --- state ----------------------------------------------------------------
     def _store(self, key: str, value: str) -> bool:
+        # The player is not trusted blindly: values never grow beyond the
+        # protocol's own maximum (titles are 64 characters).
+        value = value[: const.MAX_VALUE_LENGTH]
         if key in ("ET", "RM") and value.lower() in _EMPTY_ANSWERS:
             return self._remove(key)
         changed = self.data.values.get(key) != value
@@ -456,7 +463,7 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
         if self.data.online:
             return
         if self._was_online:
-            _LOGGER.info("Denon player at %s is back online", self.client.host)
+            _LOGGER.info("%s is back online", self.client.name)
         self._was_online = True
         self._offline_since = None
         self._power_on_until = 0.0
@@ -473,9 +480,9 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
         if not self.data.online and self.data.reason == reason:
             return
         if self.data.online:
-            _LOGGER.info("Denon player at %s is offline (%s)", self.client.host, reason)
+            _LOGGER.info("%s is offline (%s)", self.client.name, reason)
         else:
-            _LOGGER.debug("Denon player at %s still offline (%s)", self.client.host, reason)
+            _LOGGER.debug("%s still offline (%s)", self.client.name, reason)
         self.data.online = False
         self.data.reason = reason
         self.data.values.clear()
@@ -508,7 +515,7 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
     @callback
     def _handle_disconnect(self, reason: str) -> None:
         """Connection dropped: do one quick check before calling it offline."""
-        _LOGGER.debug("Connection to %s dropped (%s), quick check", self.client.host, reason)
+        _LOGGER.debug("Connection to %s dropped (%s), quick check", self.client.name, reason)
         self._quick_check = True
         self._wake.set()
 
@@ -529,17 +536,27 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
     async def async_send_command(self, command: str) -> bool:
         """Send a control command. Offline or refused is logged at debug only."""
         if not (self.client.connected and self.data.online):
-            _LOGGER.debug("Player %s offline, %s not sent", self.client.host, command)
+            _LOGGER.debug("Player %s offline, %s not sent", self.client.name, command)
             return False
+        if self._pending_commands >= const.MAX_PENDING_COMMANDS:
+            # An automation in a loop must not flood the player.
+            _LOGGER.debug("Too many commands waiting for %s, %s dropped", self.client.name, command)
+            return False
+        self._pending_commands += 1
         try:
             reply = await self.client.request(command)
+        except DenonCommandError as err:
+            _LOGGER.debug("Command not sent to %s: %s", self.client.name, err)
+            return False
         except DenonConnectionError as err:
-            _LOGGER.debug("Command %s to %s failed: %s", command, self.client.host, err)
+            _LOGGER.debug("Command %s to %s failed: %s", command, self.client.name, err.reason)
             await self._connection_failed(err)
             return False
+        finally:
+            self._pending_commands -= 1
         if not reply.ok:
             # Normal during unskippable disc content or in menus.
-            _LOGGER.debug("Player %s refused %s (nack)", self.client.host, command)
+            _LOGGER.debug("Player %s refused %s (nack)", self.client.name, command)
             return False
         self._details_due = True
         self._schedule_poll(const.REFRESH_DELAY_COMMAND)
@@ -573,7 +590,7 @@ class DenonCoordinator(DataUpdateCoordinator[DenonData]):
             return
         entity_id = self.power_on_entity
         if entity_id is None or self._stopping:
-            _LOGGER.debug("No power-on entity configured for %s", self.client.host)
+            _LOGGER.debug("No power-on entity configured for %s", self.client.name)
             return
         domain = entity_id.split(".", 1)[0]
         service = const.POWER_ON_SERVICES.get(domain)

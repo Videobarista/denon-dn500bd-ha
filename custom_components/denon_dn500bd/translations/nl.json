@@ -29,7 +29,8 @@
       }
     },
     "error": {
-      "cannot_connect": "De speler is niet bereikbaar. Controleer het adres, of de speler aan staat en of er geen andere controller met poort 9030 verbonden is."
+      "cannot_connect": "De speler is niet bereikbaar. Controleer het adres, of de speler aan staat en of er geen andere controller met poort 9030 verbonden is.",
+      "invalid_host": "Vul alleen een IP-adres of hostnaam in, zonder http, poortnummer of pad."
     },
     "abort": {
       "already_configured": "Deze speler is al ingesteld.",

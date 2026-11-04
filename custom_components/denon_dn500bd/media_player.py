@@ -13,6 +13,7 @@ from homeassistant.components.media_player import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .api import parse_number
 from .coordinator import DenonConfigEntry, DenonCoordinator
 from .definitions import (
     CAP_MUTE,
@@ -124,8 +125,8 @@ class DenonMediaPlayer(DenonEntity, MediaPlayerEntity):
     @property
     def media_track(self) -> int | None:
         """Current chapter (DVD/BD) or track number."""
-        value = self.coordinator.data.get("Tr")
-        return int(value) if value and value.isdigit() and int(value) > 0 else None
+        number = parse_number(self.coordinator.data.get("Tr"))
+        return number if number else None
 
     @property
     def media_duration(self) -> int | None:

@@ -9,6 +9,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .api import is_digits
 from .coordinator import DenonConfigEntry, DenonCoordinator
 from .definitions import SELECTS, SelectSetting
 from .entity import DenonEntity
@@ -61,7 +62,7 @@ class DenonSelect(DenonEntity, SelectEntity):
 
     def _command(self, option: str) -> str:
         suffix = self._setting.options[option]
-        if self._shift and suffix.isdigit():
+        if self._shift and is_digits(suffix):
             return str(int(suffix) + self._shift)
         return suffix
 
@@ -80,7 +81,7 @@ class DenonSelect(DenonEntity, SelectEntity):
         if after == self._expected.get(option):
             self._shift = 0
             _LOGGER.debug("%s: documented set codes confirmed", code)
-        elif after == sent and sent.isdigit():
+        elif after == sent and is_digits(sent):
             # The player uses one table for setting and reporting: the
             # documented set codes are one too low. Correct it right away.
             self._shift = 1

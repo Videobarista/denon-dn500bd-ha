@@ -2,22 +2,28 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from custom_components.denon_dn500bd import const
 from custom_components.denon_dn500bd.api import (
     DenonClient,
+    DenonCommandError,
     DenonConnectionError,
     clean_text,
     format_hms,
     format_signed,
+    is_digits,
     parse_burst,
     parse_hhhmmss,
     parse_mmmss,
     parse_number,
     parse_signed,
     split_message,
+    validate_command,
 )
+from custom_components.denon_dn500bd.definitions import BUTTONS, NUMBERS, SELECTS, SWITCHES
 
 from .fake_player import FakePlayer, free_port, wait_for
 
@@ -152,3 +158,91 @@ async def test_client_reports_dropped_connection(player: FakePlayer) -> None:
     with pytest.raises(DenonConnectionError):
         await client.request("?PW")
     await client.close()
+
+
+@pytest.mark.parametrize(
+    "command",
+    ["?ST", "2353", "DVOV+03", "DVOV-90", "PCDG+", "DVADLG-", "23KL", "PCTMDTR", "mt00"],
+)
+def test_valid_commands_pass_the_guard(command: str) -> None:
+    """Every real command passes the guard unchanged."""
+    assert validate_command(command) == command
+
+
+@pytest.mark.parametrize(
+    "command", ["", "PW01\r@0PW00", "@0PW00", "a b", "ST\n", "Ström", "X" * 600]
+)
+def test_unsafe_commands_are_refused(command: str) -> None:
+    """Enters, start characters, spaces, non-ASCII or oversized commands never go out."""
+    with pytest.raises(DenonCommandError):
+        validate_command(command)
+
+
+def test_all_table_commands_are_safe() -> None:
+    """The tables only produce commands the guard accepts."""
+    for button in BUTTONS:
+        validate_command(button.command)
+    for select in SELECTS:
+        for suffix in select.options.values():
+            validate_command(select.code + suffix)
+    for switch in SWITCHES:
+        validate_command(switch.code + switch.on)
+        validate_command(switch.code + switch.off)
+    for number in NUMBERS:
+        for level in (number.minimum, 0, number.maximum):
+            validate_command(number.code + format_signed(level, number.width))
+
+
+def test_untrusted_values() -> None:
+    """Odd values from the device never crash the parsers."""
+    assert not is_digits("\u00b2")  # superscript two counts as a digit for str.isdigit()
+    assert parse_number("00\u00b2") is None
+    assert parse_hhhmmss("000011\u00b2") is None
+    assert parse_number("9" * 5000) is None  # no int() on huge numbers
+    assert clean_text("Mo\x00vie\x1b[31m") == "Movie[31m"
+
+
+async def test_client_refuses_unsafe_command(player: FakePlayer) -> None:
+    """An unsafe command raises before anything is sent."""
+    client = DenonClient("127.0.0.1", player.port)
+    await client.connect()
+    try:
+        sent = len(player.received)
+        with pytest.raises(DenonCommandError):
+            await client.request("PW01\r@0PW00")
+        assert len(player.received) == sent
+        assert (await client.request("?PW")).ok
+    finally:
+        await client.close()
+
+
+async def test_client_survives_garbage(player: FakePlayer) -> None:
+    """An oversized burst is discarded; the connection keeps working."""
+    pushed: list[str] = []
+    client = DenonClient("127.0.0.1", player.port, on_messages=pushed.extend)
+    await client.connect()
+    try:
+        player.send_raw(b"@0ST" + b"X" * 20000)
+        await asyncio.sleep(0.2)  # the garbage burst is read and discarded
+        reply = await client.request("?CD")
+        assert reply.ok
+        assert all(len(message) < 100 for message in pushed)
+    finally:
+        await client.close()
+
+
+async def test_client_survives_handler_error(player: FakePlayer) -> None:
+    """A failing message handler does not stop the read loop."""
+
+    def broken(messages: list[str]) -> None:
+        raise RuntimeError("boom")
+
+    client = DenonClient("127.0.0.1", player.port, on_messages=broken)
+    await client.connect()
+    try:
+        player.push("STPP")
+        reply = await client.request("?ST")
+        assert reply.ok
+        assert client.connected
+    finally:
+        await client.close()

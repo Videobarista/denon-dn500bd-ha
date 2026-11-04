@@ -8,6 +8,7 @@
 [![CodeQL](https://github.com/Videobarista/denon-dn500bd-ha/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/Videobarista/denon-dn500bd-ha/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Quality scale: Bronze (aligned)](https://img.shields.io/badge/quality%20scale-Bronze%20(aligned)-cd7f32)](#quality-scale)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Videobarista/denon-dn500bd-ha/badge)](https://scorecard.dev/viewer/?uri=github.com/Videobarista/denon-dn500bd-ha)
 
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Videobarista&repository=denon-dn500bd-ha&category=integration)
 
@@ -184,6 +185,56 @@ differs from the RS-232 description:
   on the first change, checks whether the set codes are shifted as well and
   corrects itself if needed.
 - Fast forward / rewind are not offered: the guide lists conflicting codes.
+
+## Security
+
+The player's control protocol has **no login and no encryption**: anything
+on the same network can control it, read its status or pretend to be it.
+The integration adds its own safety layer, but only the network can close
+that gap.
+
+What the integration does:
+
+- **Only fixed commands reach the player.** Commands come from built-in
+  tables; numbers are rounded and clamped, choices come from a fixed list.
+  A final guard refuses anything that is not plain printable ASCII, contains
+  the start (`@`) or end (Enter) character, or exceeds the protocol's 600
+  bytes. No free text from Home Assistant is ever sent.
+- **Validated input.** The host must be an IP address or host name (no
+  scheme, port or path); the port is 1-65535; the poll interval 5-60 s; the
+  power-on entity is limited to scripts, switches and buttons.
+- **The player's answers are not trusted blindly.** A burst larger than
+  2 KB is discarded, values are capped at 64 characters, control characters
+  are removed from titles, numbers are parsed defensively, and an error while
+  handling a message never stops the connection.
+- **No flooding.** One connection, at least 40 ms between commands (the
+  protocol asks for 30 ms), at most 10 control commands waiting (more are
+  dropped, for example from an automation in a loop), and reconnects every
+  5-30 s with one small request.
+- **Nothing to leak.** No passwords or tokens exist; log messages name the
+  player instead of showing its IP address, raw debug lines are shortened,
+  and diagnostics redact the address.
+- **No open ports.** The integration only makes an outgoing TCP connection
+  to the player; it does not listen on any port or use webhooks.
+- **Risky settings are not exposed**: network settings, firmware update,
+  factory reset and the parental-control password are left out on purpose.
+- **No third-party Python packages**; CI actions are pinned to commit SHAs
+  and run with minimal permissions; Ruff's security rules (Bandit) and
+  CodeQL run on every change.
+
+Recommended network setup:
+
+1. Put the player in an AV/IoT VLAN with a DHCP reservation.
+2. Allow only Home Assistant to reach the player on **TCP 9030**; block all
+   other incoming traffic to the player.
+3. Block the player's own internet access (set BD-Live network access to
+   *Prohibited*); open it only temporarily for a firmware update.
+4. Block the player from reaching Home Assistant and the rest of your LAN;
+   it never needs to start a connection itself.
+5. Keep an IR or RS-232 gateway used for power-on in the same VLAN, with the
+   same rules.
+
+See [SECURITY.md](SECURITY.md) to report a vulnerability.
 
 ## Quality scale
 

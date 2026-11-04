@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncGenerator
 import logging
 
@@ -201,3 +202,26 @@ async def test_resolution_shifted_set_codes(
     await wait_for(lambda: hass.states.get(select_id).state == "1080p")
     assert "DVVR7" in player.received
     assert "DVVR6" not in player.received
+
+
+async def test_device_values_are_capped(
+    hass: HomeAssistant, entry: MockConfigEntry, player: FakePlayer
+) -> None:
+    """Over-long or odd values from the device are capped, not stored as-is."""
+    player.push("ti" + "\x07A" * 300)
+    player_id = entity_id(hass, entry, "media_player", "media_player")
+    await wait_for(lambda: hass.states.get(player_id).attributes.get("media_title") is not None)
+    title = hass.states.get(player_id).attributes["media_title"]
+    assert set(title) == {"A"}
+    assert len(title) <= 64
+
+
+async def test_command_flood_is_limited(
+    hass: HomeAssistant, entry: MockConfigEntry, player: FakePlayer
+) -> None:
+    """A burst of commands (automation loop) is capped instead of queued forever."""
+    coordinator = entry.runtime_data
+    results = await asyncio.gather(*(coordinator.async_send_command("PCHM") for _ in range(25)))
+    assert results.count(True) <= 10
+    assert results.count(False) >= 15
+    assert hass.states.get(entity_id(hass, entry, "sensor", "connection")).state == "online"

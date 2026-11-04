@@ -29,7 +29,8 @@
       }
     },
     "error": {
-      "cannot_connect": "Cannot reach the player. Check the address, that the player is switched on, and that no other controller is connected to port 9030."
+      "cannot_connect": "Cannot reach the player. Check the address, that the player is switched on, and that no other controller is connected to port 9030.",
+      "invalid_host": "Enter an IP address or host name only, without http, a port number or a path."
     },
     "abort": {
       "already_configured": "This player is already configured.",

@@ -75,6 +75,10 @@ _unreachable_errnos = {
 }
 
 
+class DenonCommandError(ValueError):
+    """A command that may not be sent (invalid characters or too long)."""
+
+
 class DenonConnectionError(Exception):
     """The player could not be reached; ``reason`` is one of const.REASON_*."""
 
@@ -168,9 +172,36 @@ def message_codes(messages: list[str]) -> set[str]:
     return codes
 
 
+# Commands are built from fixed tables only; this guard makes sure nothing
+# else can ever reach the wire: printable ASCII, no start character "@",
+# no end character "\r", within the protocol's packet size.
+_COMMAND_RE = re.compile(r"[\x21-\x3f\x41-\x7e]+")
+# Control characters are dropped from text the player reports.
+_CONTROL_RE = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+
+
+def _errno_name(err: OSError) -> str:
+    """Short error name for logs; OS messages can contain the address."""
+    if err.errno is not None:
+        return errno.errorcode.get(err.errno, str(err.errno))
+    return type(err).__name__
+
+
+def validate_command(command: str) -> str:
+    """Return the command if it is safe to send, else raise DenonCommandError."""
+    if not _COMMAND_RE.fullmatch(command) or len(command) + 3 > const.MAX_PACKET:
+        raise DenonCommandError(f"refusing to send {command[:20]!r}")
+    return command
+
+
+def is_digits(value: str | None) -> bool:
+    """True for a non-empty string of ASCII digits (not "²" and the like)."""
+    return bool(value) and value.isascii() and value.isdigit()
+
+
 def parse_hhhmmss(value: str | None) -> int | None:
     """Convert the ``hhhmmss`` time of ``?ET``/``?RM`` into seconds."""
-    if value is None or len(value) != 7 or not value.isdigit():
+    if value is None or len(value) != 7 or not is_digits(value):
         return None
     hours, minutes, seconds = int(value[:3]), int(value[3:5]), int(value[5:7])
     if minutes > 59 or seconds > 59:
@@ -180,7 +211,7 @@ def parse_hhhmmss(value: str | None) -> int | None:
 
 def parse_mmmss(value: str | None) -> int | None:
     """Convert the ``MMMSS`` or ``MMMSSFF`` time of ``?tl`` into seconds."""
-    if value is None or len(value) not in (5, 7) or not value.isdigit():
+    if value is None or len(value) not in (5, 7) or not is_digits(value):
         return None
     minutes, seconds = int(value[:3]), int(value[3:5])
     if seconds > 59:
@@ -219,7 +250,7 @@ def format_signed(value: int, width: int) -> str:
 
 def parse_number(value: str | None) -> int | None:
     """Parse ``0001`` style counters; ``UNKN``/``unknow`` give None."""
-    if value is None or not value.isdigit():
+    if value is None or len(value) > 9 or not is_digits(value):
         return None
     return int(value)
 
@@ -228,7 +259,7 @@ def clean_text(value: str | None) -> str | None:
     """Title/artist/album: ``NULL`` or empty means nothing."""
     if value is None:
         return None
-    value = value.strip()
+    value = _CONTROL_RE.sub("", value).strip()
     if not value or value.upper() == "NULL":
         return None
     return value
@@ -242,12 +273,15 @@ class DenonClient:
         host: str,
         port: int = const.DEFAULT_PORT,
         *,
+        name: str = "player",
         on_messages: Callable[[list[str]], None] | None = None,
         on_disconnect: Callable[[str], None] | None = None,
     ) -> None:
         """Initialise the client; nothing is opened until connect()."""
         self.host = host
         self.port = port
+        # Used in log messages instead of the address.
+        self.name = name
         self._on_messages = on_messages
         self._on_disconnect = on_disconnect
         self._reader: asyncio.StreamReader | None = None
@@ -257,6 +291,7 @@ class DenonClient:
         self._pending: asyncio.Future[Reply] | None = None
         self._last_send = 0.0
         self._closing = False
+        self._handler_error_logged = False
 
     @property
     def connected(self) -> bool:
@@ -274,22 +309,22 @@ class DenonClient:
         except TimeoutError as err:
             raise DenonConnectionError(const.REASON_TIMEOUT) from err
         except ConnectionRefusedError as err:
-            raise DenonConnectionError(const.REASON_REFUSED, str(err)) from err
+            raise DenonConnectionError(const.REASON_REFUSED, _errno_name(err)) from err
         except OSError as err:
             if err.errno in _unreachable_errnos:
-                raise DenonConnectionError(const.REASON_UNREACHABLE, str(err)) from err
-            raise DenonConnectionError(const.REASON_NETWORK, str(err)) from err
+                raise DenonConnectionError(const.REASON_UNREACHABLE, _errno_name(err)) from err
+            raise DenonConnectionError(const.REASON_NETWORK, _errno_name(err)) from err
 
         sock = writer.get_extra_info("socket")
         if sock is not None:
             try:
                 sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             except OSError as err:
-                _LOGGER.debug("Could not set TCP_NODELAY: %s", err)
+                _LOGGER.debug("Could not set TCP_NODELAY: %s", _errno_name(err))
         self._reader = reader
         self._writer = writer
         self._read_task = asyncio.create_task(self._read_loop(reader))
-        _LOGGER.debug("Connected to %s:%s", self.host, self.port)
+        _LOGGER.debug("Connected to %s", self.name)
 
     async def close(self) -> None:
         """Close the connection without reporting a disconnect."""
@@ -305,11 +340,12 @@ class DenonClient:
             try:
                 await writer.wait_closed()
             except OSError as err:
-                _LOGGER.debug("Error while closing connection: %s", err)
+                _LOGGER.debug("Error while closing connection: %s", _errno_name(err))
         self._fail_pending(const.REASON_LOST)
 
     async def request(self, command: str) -> Reply:
         """Send one command (``"?ST"``, ``"2353"`` ...) and wait for ack/nack."""
+        validate_command(command)
         async with self._lock:
             writer = self._writer
             if writer is None or writer.is_closing():
@@ -329,7 +365,7 @@ class DenonClient:
                 raise DenonConnectionError(const.REASON_NO_RESPONSE, command) from err
             except OSError as err:
                 await self._drop(const.REASON_LOST)
-                raise DenonConnectionError(const.REASON_LOST, str(err)) from err
+                raise DenonConnectionError(const.REASON_LOST, _errno_name(err)) from err
             finally:
                 self._pending = None
 
@@ -344,24 +380,36 @@ class DenonClient:
         reason = const.REASON_LOST
         try:
             while True:
-                data = await reader.read(4096)
+                data = await reader.read(const.READ_CHUNK)
                 if not data:
                     break
                 eof = False
+                oversized = False
                 while True:
                     try:
-                        more = await asyncio.wait_for(reader.read(4096), const.BURST_IDLE)
+                        more = await asyncio.wait_for(
+                            reader.read(const.READ_CHUNK), const.BURST_IDLE
+                        )
                     except TimeoutError:
                         break
                     if not more:
                         eof = True
                         break
+                    if oversized:
+                        continue  # discard until the line is quiet again
                     data += more
-                self._handle_burst(data)
+                    if len(data) > const.MAX_BURST:
+                        oversized = True
+                        data = b""
+                if oversized or len(data) > const.MAX_BURST:
+                    # Never happens with a real player; memory stays bounded.
+                    _LOGGER.debug("Discarded an oversized burst from %s", self.name)
+                else:
+                    self._handle_burst(data)
                 if eof:
                     break
         except OSError as err:
-            _LOGGER.debug("Read error from %s: %s", self.host, err)
+            _LOGGER.debug("Read error from %s: %s", self.name, _errno_name(err))
         if self._closing or self._reader is not reader:
             return
         self._writer = None
@@ -371,10 +419,17 @@ class DenonClient:
         self._report_disconnect(reason)
 
     def _handle_burst(self, data: bytes) -> None:
-        _LOGGER.debug("Received %r", data)
+        _LOGGER.debug("Received %r%s", data[:120], "..." if len(data) > 120 else "")
         burst = parse_burst(data)
         if burst.messages and self._on_messages is not None:
-            self._on_messages(burst.messages)
+            try:
+                self._on_messages(burst.messages)
+            except Exception:  # noqa: BLE001 - the read loop must keep running
+                if not self._handler_error_logged:
+                    self._handler_error_logged = True
+                    _LOGGER.exception("Error handling status from %s", self.name)
+                else:
+                    _LOGGER.debug("Error handling status from %s", self.name, exc_info=True)
         pending = self._pending
         if burst.marker is not None and pending is not None and not pending.done():
             pending.set_result(Reply(burst.marker, burst.bare, burst.messages))
@@ -385,6 +440,6 @@ class DenonClient:
             pending.set_exception(DenonConnectionError(reason))
 
     def _report_disconnect(self, reason: str) -> None:
-        _LOGGER.debug("Connection to %s lost (%s)", self.host, reason)
+        _LOGGER.debug("Connection to %s lost (%s)", self.name, reason)
         if self._on_disconnect is not None:
             self._on_disconnect(reason)
