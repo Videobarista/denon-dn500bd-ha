@@ -206,7 +206,8 @@ What the integration does:
 - **The player's answers are not trusted blindly.** A burst larger than
   2 KB is discarded, values are capped at 64 characters, control characters
   are removed from titles, numbers are parsed defensively, and an error while
-  handling a message never stops the connection.
+  handling a message never stops the connection. The parser is fuzzed with
+  [Atheris](https://github.com/google/atheris) in CI.
 - **No flooding.** One connection, at least 40 ms between commands (the
   protocol asks for 30 ms), at most 10 control commands waiting (more are
   dropped, for example from an automation in a loop), and reconnects every
