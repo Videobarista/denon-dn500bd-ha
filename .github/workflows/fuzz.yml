@@ -1,0 +1,32 @@
+name: Fuzz
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  atheris:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Install Atheris
+        run: pip install -r requirements_fuzz.txt
+      - name: Fuzz the answer parser
+        # New inputs go to a scratch folder; the seeds in fuzz/corpus are only read.
+        run: |
+          mkdir -p "$RUNNER_TEMP/corpus"
+          python fuzz/fuzz_parser.py -max_total_time=120 -max_len=2048 -timeout=10 \
+            -rss_limit_mb=2048 "$RUNNER_TEMP/corpus" fuzz/corpus
