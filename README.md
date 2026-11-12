@@ -6,6 +6,8 @@
 [![HACS](https://github.com/Videobarista/denon-dn500bd-ha/actions/workflows/hacs.yml/badge.svg?branch=main)](https://github.com/Videobarista/denon-dn500bd-ha/actions/workflows/hacs.yml)
 [![Tests](https://github.com/Videobarista/denon-dn500bd-ha/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Videobarista/denon-dn500bd-ha/actions/workflows/tests.yml)
 [![CodeQL](https://github.com/Videobarista/denon-dn500bd-ha/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/Videobarista/denon-dn500bd-ha/actions/workflows/codeql.yml)
+[![Local only](https://github.com/Videobarista/denon-dn500bd-ha/actions/workflows/local-only.yml/badge.svg?branch=main)](https://github.com/Videobarista/denon-dn500bd-ha/actions/workflows/local-only.yml)
+[![IoT class](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FVideobarista%2Fdenon-dn500bd-ha%2Fmain%2Fcustom_components%2Fdenon_dn500bd%2Fmanifest.json&query=%24.iot_class&label=IoT%20class&color=41BDF5)](#local-only)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Quality scale: Bronze (aligned)](https://img.shields.io/badge/quality%20scale-Bronze%20(aligned)-cd7f32)](#quality-scale)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Videobarista/denon-dn500bd-ha/badge)](https://scorecard.dev/viewer/?uri=github.com/Videobarista/denon-dn500bd-ha)
@@ -222,6 +224,35 @@ What the integration does:
 - **No third-party Python packages**; CI actions are pinned to commit SHAs
   and run with minimal permissions; Ruff's security rules (Bandit) and
   CodeQL run on every change.
+
+### Local only
+
+The integration only talks to your player, never to the internet or any
+other service. Two automated checks back the **Local only** badge:
+
+- `scripts/check_local_only.py` (the badge's workflow) reads the manifest and
+  the code: local IoT class, no dependencies, discovery or extra Python
+  packages, only allowed imports, no listeners, HTTP, UDP or raw sockets, one
+  TCP connection from `api.py` to the configured host and port, and no
+  hard-coded addresses. Every address comes from your configuration.
+- The tests run the real client against a fake player and record every
+  connection during the config flow, setup, polling, a reconnect and
+  commands; all of them must go to the configured address and port.
+
+Two things are allowed on purpose, and explained in the checker:
+
+- `api.py` uses the `socket` module only to switch off Nagle's algorithm
+  (`TCP_NODELAY`) on the player's own connection.
+- If you set a **power-on entity**, turning the player on calls that
+  entity's service (script, switch, button). What that entity does, for
+  example a cloud-controlled smart plug, is up to its own integration.
+
+A host name you enter is looked up through your own DNS. The **IoT class**
+badge shows the class declared in the manifest (`local_push`: the player
+pushes changes over the local network). What Home Assistant itself does (for
+example its optional analytics) is up to your Home Assistant settings.
+
+### Network advice
 
 Recommended network setup:
 
